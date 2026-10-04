@@ -1,51 +1,14 @@
-STOCKNEWS V2 — READY-MADE WEBSITE
-====================================
+StockNews V3
+API-ready Cloudflare Workers structure.
 
-WHAT IS NEW
------------
-1. Admin Panel at #/admin
-2. Add News form
-3. Delete News
-4. News saved in browser LocalStorage
-5. Individual stock pages at #/stock/SYMBOL
-6. Stock Screener links to individual stock pages
-7. Financial/key-stat sections on stock pages
-8. Related-news area
-9. Mobile responsive design
+Includes:
+- frontend-ready StockNews structure
+- Cloudflare Worker backend endpoint /api/health
+- safe place to add a licensed market-data provider
+- Wrangler configuration
 
-IMPORTANT LIMITATION
---------------------
-This is a FRONT-END prototype. The Admin Panel is not a secure online CMS.
-Posts are stored in the browser's LocalStorage. If you clear browser data,
-the posts can disappear. A real public site needs a backend/database and
-secure admin login.
-
-DEMO DATA
----------
-Stock prices and financial figures in this version are illustrative/demo
-values. Do not publish them as live or verified market data.
-
-HOW TO OPEN
------------
-Extract the ZIP and open index.html.
-
-NEXT PRODUCTION VERSION
------------------------
-- Secure admin login
-- Cloud database
-- Image upload for news
-- Edit news
-- Categories/tags
-- SEO-friendly URLs
-- Sitemap + robots.txt
-- Live NSE/BSE market-data API
-- Historical charts
-- Real-time stock pages
-- IPO/dividend/corporate-action modules
-- Search
-- Ad/monetization slots
-
-NEWS COPYRIGHT
---------------
-Use original reporting/summaries. Do not copy complete articles from
-third-party publishers without permission.
+Important:
+Demo market data must not be presented as live/verified data.
+Never put API secrets in browser JavaScript.
+Confirm commercial display/redistribution rights for NSE/BSE data.
+Admin/database/authentication should be upgraded before public editorial use.
