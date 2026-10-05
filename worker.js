@@ -11,16 +11,34 @@ function json(data, status = 200, extra = {}) {
   });
 }
 
-function isAdmin(request, env) {
+async function sha256(value) {
+  const data = new TextEncoder().encode(value);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+
+  return [...new Uint8Array(hash)]
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function makeSession(password) {
+  return sha256(password + "|stocknews-admin-session-2026");
+}
+
+async function isAdmin(request, env) {
   const cookie = request.headers.get("Cookie") || "";
+
   const token = cookie.match(
     new RegExp(COOKIE + "=([^;]+)")
   )?.[1];
 
-  if (!token || !env.ADMIN_SESSION) return false;
+  if (!token || !env.ADMIN_PASSWORD) {
+    return false;
+  }
 
   try {
-    return decodeURIComponent(token) === env.ADMIN_SESSION;
+    const expected = await makeSession(env.ADMIN_PASSWORD);
+
+    return decodeURIComponent(token) === expected;
   } catch (e) {
     return false;
   }
@@ -40,16 +58,24 @@ export default {
       try {
         const body = await request.json();
 
-        if (
-          !env.ADMIN_PASSWORD ||
-          !env.ADMIN_SESSION ||
-          body.password !== env.ADMIN_PASSWORD
-        ) {
-          return json({ error: "Unauthorized" }, 401);
+        if (!env.ADMIN_PASSWORD) {
+          return json(
+            { error: "ADMIN_PASSWORD is not configured" },
+            500
+          );
         }
 
+        if (body.password !== env.ADMIN_PASSWORD) {
+          return json(
+            { error: "Unauthorized" },
+            401
+          );
+        }
+
+        const session = await makeSession(env.ADMIN_PASSWORD);
+
         const cookie =
-          `${COOKIE}=${encodeURIComponent(env.ADMIN_SESSION)}; ` +
+          `${COOKIE}=${encodeURIComponent(session)}; ` +
           `Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=86400`;
 
         return json(
@@ -59,7 +85,10 @@ export default {
         );
 
       } catch (e) {
-        return json({ error: "Bad request" }, 400);
+        return json(
+          { error: "Bad request" },
+          400
+        );
       }
     }
 
@@ -70,7 +99,7 @@ export default {
       url.pathname === "/api/admin/check" &&
       request.method === "GET"
     ) {
-      const loggedIn = isAdmin(request, env);
+      const loggedIn = await isAdmin(request, env);
 
       return json(
         { admin: loggedIn },
@@ -102,15 +131,21 @@ export default {
       url.pathname === "/api/admin/news" &&
       request.method === "POST"
     ) {
-      if (!isAdmin(request, env)) {
-        return json({ error: "Unauthorized" }, 401);
+      if (!(await isAdmin(request, env))) {
+        return json(
+          { error: "Unauthorized" },
+          401
+        );
       }
 
       try {
         const body = await request.json();
 
         if (!body.t || !body.c || !body.b) {
-          return json({ error: "Missing fields" }, 400);
+          return json(
+            { error: "Missing fields" },
+            400
+          );
         }
 
         const item = {
@@ -120,13 +155,11 @@ export default {
           b: String(body.b)
         };
 
-        const key = "news";
-
         let items = [];
 
         try {
           items = JSON.parse(
-            await env.STOCKNEWS_KV.get(key) || "[]"
+            await env.STOCKNEWS_KV.get("news") || "[]"
           );
         } catch (e) {
           items = [];
@@ -135,14 +168,17 @@ export default {
         items.unshift(item);
 
         await env.STOCKNEWS_KV.put(
-          key,
+          "news",
           JSON.stringify(items.slice(0, 500))
         );
 
         return json(item, 201);
 
       } catch (e) {
-        return json({ error: "Bad request" }, 400);
+        return json(
+          { error: "Bad request" },
+          400
+        );
       }
     }
 
