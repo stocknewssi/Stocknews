@@ -5,3 +5,7 @@ main = "worker.js"
 [assets]
 directory = "."
 binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "STOCKNEWS_KV"
+id = "897e328377e4427bb40bed5996846b04"
