@@ -1,5 +1,11 @@
 const COOKIE = "stocknews_admin";
-const DEBUG_MARKER = "STOCKNEWS_DEBUG_123";
+
+// Angel One session cache (Worker instance level)
+let angelSession = {
+  jwt: null,
+  expiresAt: 0
+};
+
 function json(data, status = 200, extra = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -37,30 +43,247 @@ async function isAdmin(request, env) {
 
   try {
     const expected = await makeSession(env.ADMIN_PASSWORD);
-
     return decodeURIComponent(token) === expected;
   } catch (e) {
     return false;
   }
 }
 
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-if (url.pathname === "/api/admin/debug" && request.method === "GET") {
-  return json({
-    adminPasswordConfigured: !!env.ADMIN_PASSWORD,
-    kvConfigured: !!env.STOCKNEWS_KV
-  });
+/* =========================================
+   TOTP GENERATOR
+   ========================================= */
+
+function base32ToBytes(base32) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const clean = base32
+    .replace(/=+$/, "")
+    .replace(/\s+/g, "")
+    .toUpperCase();
+
+  let bits = "";
+  for (const c of clean) {
+    const val = alphabet.indexOf(c);
+    if (val < 0) throw new Error("Invalid TOTP secret");
+    bits += val.toString(2).padStart(5, "0");
+  }
+
+  const bytes = [];
+
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.slice(i, i + 8), 2));
+  }
+
+  return new Uint8Array(bytes);
 }
-    // -----------------------------
-    // ADMIN LOGIN
-    // -----------------------------
+
+async function generateTOTP(secret) {
+  const keyBytes = base32ToBytes(secret);
+
+  const counter = Math.floor(Date.now() / 1000 / 30);
+
+  const counterBytes = new ArrayBuffer(8);
+  const view = new DataView(counterBytes);
+
+  view.setUint32(0, Math.floor(counter / 0x100000000));
+  view.setUint32(4, counter >>> 0);
+
+  const key = await crypto.subtle.importKey(
+    "raw",
+    keyBytes,
+    { name: "HMAC", hash: "SHA-1" },
+    false,
+    ["sign"]
+  );
+
+  const signature = new Uint8Array(
+    await crypto.subtle.sign(
+      "HMAC",
+      key,
+      counterBytes
+    )
+  );
+
+  const offset = signature[signature.length - 1] & 0x0f;
+
+  const code =
+    ((signature[offset] & 0x7f) << 24) |
+    ((signature[offset + 1] & 0xff) << 16) |
+    ((signature[offset + 2] & 0xff) << 8) |
+    (signature[offset + 3] & 0xff);
+
+  return String(code % 1000000).padStart(6, "0");
+}
+
+/* =========================================
+   ANGEL ONE LOGIN
+   ========================================= */
+
+async function angelLogin(env) {
+
+  if (
+    angelSession.jwt &&
+    Date.now() < angelSession.expiresAt
+  ) {
+    return angelSession.jwt;
+  }
+
+  if (
+    !env.ANGEL_API_KEY ||
+    !env.ANGEL_CLIENT_ID ||
+    !env.ANGEL_PIN ||
+    !env.ANGEL_TOTP_SECRET
+  ) {
+    throw new Error("Angel One secrets are not configured");
+  }
+
+  const totp = await generateTOTP(
+    env.ANGEL_TOTP_SECRET
+  );
+
+  const response = await fetch(
+    "https://apiconnect.angelone.in/rest/auth/angelbroking/user/v1/loginByPassword",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-PrivateKey": env.ANGEL_API_KEY,
+        "X-SourceID": "WEB",
+        "X-UserType": "USER"
+      },
+      body: JSON.stringify({
+        clientcode: env.ANGEL_CLIENT_ID,
+        password: env.ANGEL_PIN,
+        totp: totp
+      })
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok || !result.status || !result.data?.jwtToken) {
+    throw new Error(
+      result.message || "Angel One login failed"
+    );
+  }
+
+  angelSession.jwt = result.data.jwtToken;
+
+  // Keep session for about 20 minutes
+  angelSession.expiresAt =
+    Date.now() + (20 * 60 * 1000);
+
+  return angelSession.jwt;
+}
+
+/* =========================================
+   ANGEL ONE LIVE MARKET DATA
+   ========================================= */
+
+async function getAngelPrices(env, request) {
+
+  const jwt = await angelLogin(env);
+
+  const publicIP =
+    request.headers.get("CF-Connecting-IP") ||
+    "127.0.0.1";
+
+  const response = await fetch(
+    "https://apiconnect.angelone.in/rest/secure/angelbroking/market/v1/quote/",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": `Bearer ${jwt}`,
+        "X-PrivateKey": env.ANGEL_API_KEY,
+        "X-SourceID": "WEB",
+        "X-UserType": "USER",
+        "X-ClientLocalIP": "127.0.0.1",
+        "X-ClientPublicIP": publicIP,
+        "X-MACAddress": "00:00:00:00:00:00"
+      },
+      body: JSON.stringify({
+        mode: "LTP",
+        exchangeTokens: {
+          NSE: [
+            "2885",
+            "11536",
+            "1333",
+            "1594",
+            "4963",
+            "1660",
+            "3045"
+          ]
+        }
+      })
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok || !result.status) {
+    throw new Error(
+      result.message || "Angel One market data failed"
+    );
+  }
+
+  const fetched = result.data?.fetched || [];
+
+  return fetched.map(x => ({
+    symbol: x.tradingSymbol,
+    token: x.symbolToken,
+    price: x.ltp
+  }));
+}
+
+/* =========================================
+   WORKER
+   ========================================= */
+
+export default {
+
+  async fetch(request, env) {
+
+    const url = new URL(request.url);
+
+    /* -------------------------------------
+       ANGEL TEST
+       ------------------------------------- */
+
+    if (
+      url.pathname === "/api/market" &&
+      request.method === "GET"
+    ) {
+      try {
+
+        const prices =
+          await getAngelPrices(env, request);
+
+        return json({
+          success: true,
+          prices
+        });
+
+      } catch (e) {
+
+        return json({
+          success: false,
+          error: e.message
+        }, 500);
+      }
+    }
+
+    /* -------------------------------------
+       ADMIN LOGIN
+       ------------------------------------- */
+
     if (
       url.pathname === "/api/admin/login" &&
       request.method === "POST"
     ) {
+
       try {
+
         const body = await request.json();
 
         if (!env.ADMIN_PASSWORD) {
@@ -77,7 +300,8 @@ if (url.pathname === "/api/admin/debug" && request.method === "GET") {
           );
         }
 
-        const session = await makeSession(env.ADMIN_PASSWORD);
+        const session =
+          await makeSession(env.ADMIN_PASSWORD);
 
         const cookie =
           `${COOKIE}=${encodeURIComponent(session)}; ` +
@@ -86,10 +310,13 @@ if (url.pathname === "/api/admin/debug" && request.method === "GET") {
         return json(
           { ok: true },
           200,
-          { "Set-Cookie": cookie }
+          {
+            "Set-Cookie": cookie
+          }
         );
 
       } catch (e) {
+
         return json(
           { error: "Bad request" },
           400
@@ -97,14 +324,17 @@ if (url.pathname === "/api/admin/debug" && request.method === "GET") {
       }
     }
 
-    // -----------------------------
-    // CHECK ADMIN LOGIN
-    // -----------------------------
+    /* -------------------------------------
+       CHECK ADMIN
+       ------------------------------------- */
+
     if (
       url.pathname === "/api/admin/check" &&
       request.method === "GET"
     ) {
-      const loggedIn = await isAdmin(request, env);
+
+      const loggedIn =
+        await isAdmin(request, env);
 
       return json(
         { admin: loggedIn },
@@ -112,13 +342,15 @@ if (url.pathname === "/api/admin/debug" && request.method === "GET") {
       );
     }
 
-    // -----------------------------
-    // ADMIN LOGOUT
-    // -----------------------------
+    /* -------------------------------------
+       LOGOUT
+       ------------------------------------- */
+
     if (
       url.pathname === "/api/admin/logout" &&
       request.method === "POST"
     ) {
+
       return json(
         { ok: true },
         200,
@@ -129,13 +361,15 @@ if (url.pathname === "/api/admin/debug" && request.method === "GET") {
       );
     }
 
-    // -----------------------------
-    // PUBLISH NEWS
-    // -----------------------------
+    /* -------------------------------------
+       PUBLISH NEWS
+       ------------------------------------- */
+
     if (
       url.pathname === "/api/admin/news" &&
       request.method === "POST"
     ) {
+
       if (!(await isAdmin(request, env))) {
         return json(
           { error: "Unauthorized" },
@@ -144,7 +378,9 @@ if (url.pathname === "/api/admin/debug" && request.method === "GET") {
       }
 
       try {
-        const body = await request.json();
+
+        const body =
+          await request.json();
 
         if (!body.t || !body.c || !body.b) {
           return json(
@@ -163,10 +399,14 @@ if (url.pathname === "/api/admin/debug" && request.method === "GET") {
         let items = [];
 
         try {
+
           items = JSON.parse(
-            await env.STOCKNEWS_KV.get("news") || "[]"
+            await env.STOCKNEWS_KV.get("news") ||
+            "[]"
           );
+
         } catch (e) {
+
           items = [];
         }
 
@@ -174,12 +414,15 @@ if (url.pathname === "/api/admin/debug" && request.method === "GET") {
 
         await env.STOCKNEWS_KV.put(
           "news",
-          JSON.stringify(items.slice(0, 500))
+          JSON.stringify(
+            items.slice(0, 500)
+          )
         );
 
         return json(item, 201);
 
       } catch (e) {
+
         return json(
           { error: "Bad request" },
           400
@@ -187,29 +430,36 @@ if (url.pathname === "/api/admin/debug" && request.method === "GET") {
       }
     }
 
-    // -----------------------------
-    // GET NEWS
-    // -----------------------------
+    /* -------------------------------------
+       GET NEWS
+       ------------------------------------- */
+
     if (
       url.pathname === "/api/news" &&
       request.method === "GET"
     ) {
+
       let items = [];
 
       try {
+
         items = JSON.parse(
-          await env.STOCKNEWS_KV.get("news") || "[]"
+          await env.STOCKNEWS_KV.get("news") ||
+          "[]"
         );
+
       } catch (e) {
+
         items = [];
       }
 
       return json(items);
     }
 
-    // -----------------------------
-    // WEBSITE FILES
-    // -----------------------------
+    /* -------------------------------------
+       WEBSITE FILES
+       ------------------------------------- */
+
     return env.ASSETS.fetch(request);
   }
 };
