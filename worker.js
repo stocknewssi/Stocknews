@@ -47,7 +47,12 @@ async function isAdmin(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-
+if (url.pathname === "/api/admin/debug" && request.method === "GET") {
+  return json({
+    adminPasswordConfigured: !!env.ADMIN_PASSWORD,
+    kvConfigured: !!env.STOCKNEWS_KV
+  });
+}
     // -----------------------------
     // ADMIN LOGIN
     // -----------------------------
