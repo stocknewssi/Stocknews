@@ -70,7 +70,6 @@ async function isAdmin(request, env) {
     return (
       decodeURIComponent(token) === expected
     );
-
   } catch (e) {
     return false;
   }
@@ -81,7 +80,6 @@ async function isAdmin(request, env) {
    ========================================= */
 
 function base32ToBytes(base32) {
-
   const alphabet =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
@@ -93,7 +91,6 @@ function base32ToBytes(base32) {
   let bits = "";
 
   for (const c of clean) {
-
     const val = alphabet.indexOf(c);
 
     if (val < 0) {
@@ -126,7 +123,6 @@ function base32ToBytes(base32) {
 }
 
 async function generateTOTP(secret) {
-
   const keyBytes =
     base32ToBytes(secret);
 
@@ -195,7 +191,6 @@ async function generateTOTP(secret) {
    ========================================= */
 
 async function angelLogin(env) {
-
   if (
     angelSession.jwt &&
     Date.now() <
@@ -233,7 +228,7 @@ async function angelLogin(env) {
           "Accept":
             "application/json",
 
-          "X-Api-Key":
+          "X-PrivateKey":
             env.ANGEL_API_KEY,
 
           "X-SourceID":
@@ -292,7 +287,6 @@ async function getAngelPrices(
   env,
   request
 ) {
-
   const jwt =
     await angelLogin(env);
 
@@ -317,7 +311,7 @@ async function getAngelPrices(
           "Authorization":
             `Bearer ${jwt}`,
 
-          "X-Api-Key":
+          "X-PrivateKey":
             env.ANGEL_API_KEY,
 
           "X-SourceID":
@@ -371,16 +365,18 @@ async function getAngelPrices(
     );
   }
 
-  return [{
-    symbol:
-      data.tradingsymbol,
+  return [
+    {
+      symbol:
+        data.tradingsymbol,
 
-    token:
-      data.symboltoken,
+      token:
+        data.symboltoken,
 
-    price:
-      data.ltp
-  }];
+      price:
+        data.ltp
+    }
+  ];
 }
 
 /* =========================================
@@ -388,7 +384,6 @@ async function getAngelPrices(
    ========================================= */
 
 export default {
-
   async fetch(request, env) {
 
     const url =
@@ -402,9 +397,7 @@ export default {
       url.pathname === "/api/ping" &&
       request.method === "GET"
     ) {
-
       return json({
-
         ok: true,
 
         angelApiKeyConfigured:
@@ -418,7 +411,6 @@ export default {
 
         totpConfigured:
           !!env.ANGEL_TOTP_SECRET
-
       });
     }
 
@@ -430,7 +422,6 @@ export default {
       url.pathname === "/api/market" &&
       request.method === "GET"
     ) {
-
       try {
 
         const prices =
@@ -440,17 +431,13 @@ export default {
           );
 
         return json({
-
           success: true,
-
           prices
-
         });
 
       } catch (e) {
 
         return json({
-
           success: false,
 
           error:
@@ -469,7 +456,6 @@ export default {
       url.pathname === "/api/admin/login" &&
       request.method === "POST"
     ) {
-
       try {
 
         const body =
@@ -540,7 +526,6 @@ export default {
       url.pathname === "/api/admin/check" &&
       request.method === "GET"
     ) {
-
       const loggedIn =
         await isAdmin(
           request,
@@ -566,7 +551,6 @@ export default {
       url.pathname === "/api/admin/logout" &&
       request.method === "POST"
     ) {
-
       return json(
         {
           ok: true
@@ -587,7 +571,6 @@ export default {
       url.pathname === "/api/admin/news" &&
       request.method === "POST"
     ) {
-
       if (
         !(await isAdmin(
           request,
@@ -625,7 +608,6 @@ export default {
         }
 
         const item = {
-
           id:
             Date.now(),
 
@@ -637,7 +619,6 @@ export default {
 
           b:
             String(body.b)
-
         };
 
         let items = [];
@@ -690,7 +671,6 @@ export default {
       url.pathname === "/api/news" &&
       request.method === "GET"
     ) {
-
       let items = [];
 
       try {
