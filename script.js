@@ -30,7 +30,10 @@ const esc = x =>
     '"': "&quot;"
   }[m]));
 
-/* Convert live Angel data into our stock format */
+/* =========================================================
+   LIVE ANGEL DATA
+   ========================================================= */
+
 function applyLivePrices(prices) {
   if (!Array.isArray(prices)) return;
 
@@ -50,35 +53,48 @@ function applyLivePrices(prices) {
 
     if (!Number.isFinite(price)) return;
 
-    /*
-      Backend currently gives price.
-      If change/changePercent is also supplied later,
-      this frontend will automatically use it.
-    */
-
     stock[2] = price;
 
     if (p.changePercent !== undefined) {
-      const change = Number(p.changePercent);
+      const value = Number(p.changePercent);
 
-      if (Number.isFinite(change)) {
-        stock[3] = change;
+      if (Number.isFinite(value)) {
+        stock[3] = value;
       }
     }
 
     if (p.change !== undefined) {
-      const change = Number(p.change);
+      const value = Number(p.change);
 
-      if (Number.isFinite(change)) {
-        stock[5] = change;
+      if (Number.isFinite(value)) {
+        stock[5] = value;
       }
     }
 
-    if (p.open !== undefined) stock[6] = Number(p.open);
-    if (p.high !== undefined) stock[7] = Number(p.high);
-    if (p.low !== undefined) stock[8] = Number(p.low);
-    if (p.close !== undefined) stock[9] = Number(p.close);
-    if (p.volume !== undefined) stock[10] = Number(p.volume);
+    if (p.open !== undefined) {
+      const value = Number(p.open);
+      if (Number.isFinite(value)) stock[6] = value;
+    }
+
+    if (p.high !== undefined) {
+      const value = Number(p.high);
+      if (Number.isFinite(value)) stock[7] = value;
+    }
+
+    if (p.low !== undefined) {
+      const value = Number(p.low);
+      if (Number.isFinite(value)) stock[8] = value;
+    }
+
+    if (p.close !== undefined) {
+      const value = Number(p.close);
+      if (Number.isFinite(value)) stock[9] = value;
+    }
+
+    if (p.volume !== undefined) {
+      const value = Number(p.volume);
+      if (Number.isFinite(value)) stock[10] = value;
+    }
   });
 }
 
@@ -123,13 +139,10 @@ async function loadLiveMarket() {
   }
 }
 
-/*
-  Refresh Angel One data every 10 seconds.
+/* =========================================================
+   AUTO REFRESH
+   ========================================================= */
 
-  This does NOT expose any Angel API key or secret
-  because all credentials remain safely inside
-  the Cloudflare Worker.
-*/
 let marketTimer = null;
 
 function startMarketRefresh() {
@@ -169,18 +182,11 @@ async function loadNews() {
       if (Array.isArray(news)) {
         return;
       }
-
     }
 
   } catch (e) {
     console.error("News API error:", e);
   }
-
-  /*
-    Local fallback.
-    This is only used if Cloudflare KV/news API
-    is temporarily unavailable.
-  */
 
   news =
     JSON.parse(localStorage.sn_news || "null") ||
@@ -201,6 +207,33 @@ async function loadNews() {
 }
 
 /* =========================================================
+   NUMBER FORMAT
+   ========================================================= */
+
+function money(value) {
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) {
+    return "—";
+  }
+
+  return "₹" + n.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function numberFormat(value) {
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) {
+    return "—";
+  }
+
+  return n.toLocaleString("en-IN");
+}
+
+/* =========================================================
    STOCK TABLE
    ========================================================= */
 
@@ -214,14 +247,23 @@ function tbl(a = stocks) {
           <th>Stock</th>
           <th>Price</th>
           <th>Change</th>
+          <th>Open</th>
+          <th>High</th>
+          <th>Low</th>
+          <th>Close</th>
           <th>Sector</th>
         </tr>
 
         ${
           a.map(x => {
 
-            const price = Number(x[2]) || 0;
-            const change = Number(x[3]) || 0;
+            const price = Number(x[2]);
+            const change = Number(x[3]);
+
+            const open = Number(x[6]);
+            const high = Number(x[7]);
+            const low = Number(x[8]);
+            const close = Number(x[9]);
 
             return `
               <tr>
@@ -237,15 +279,30 @@ function tbl(a = stocks) {
                 </td>
 
                 <td>
-                  ₹${price.toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
+                  ${money(price)}
                 </td>
 
                 <td class="${change >= 0 ? "up" : "down"}">
                   ${change >= 0 ? "+" : ""}
-                  ${change.toFixed(2)}%
+                  ${Number.isFinite(change)
+                    ? change.toFixed(2)
+                    : "—"}%
+                </td>
+
+                <td>
+                  ${money(open)}
+                </td>
+
+                <td>
+                  ${money(high)}
+                </td>
+
+                <td>
+                  ${money(low)}
+                </td>
+
+                <td>
+                  ${money(close)}
                 </td>
 
                 <td>
@@ -461,7 +518,9 @@ function screener() {
 function stockPage(s) {
 
   const x = stocks.find(
-    a => String(a[0]).toUpperCase() === String(s).toUpperCase()
+    a =>
+      String(a[0]).toUpperCase() ===
+      String(s).toUpperCase()
   );
 
   if (!x) {
@@ -470,8 +529,10 @@ function stockPage(s) {
     `;
   }
 
-  const price = Number(x[2]) || 0;
-  const change = Number(x[3]) || 0;
+  const price = Number(x[2]);
+  const change = Number(x[3]);
+
+  const changeAmount = Number(x[5]);
 
   const open = Number(x[6]);
   const high = Number(x[7]);
@@ -490,23 +551,24 @@ function stockPage(s) {
     <div class="card">
 
       <div class="value">
-
-        ₹${price.toLocaleString("en-IN", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        })}
-
+        ${money(price)}
       </div>
 
       <div class="${change >= 0 ? "up" : "down"}">
 
         ${change >= 0 ? "+" : ""}
-        ${change.toFixed(2)}%
+        ${Number.isFinite(change)
+          ? change.toFixed(2)
+          : "—"}%
 
       </div>
 
       <div class="muted">
-        Live Angel One price
+        ${
+          Number.isFinite(changeAmount)
+            ? `Change: ${changeAmount >= 0 ? "+" : ""}${changeAmount.toFixed(2)}`
+            : "Live Angel One price"
+        }
       </div>
 
     </div>
@@ -518,37 +580,39 @@ function stockPage(s) {
         <div class="card">
           <div class="muted">Open</div>
           <div class="value">
-            ${Number.isFinite(open) ? "₹" + open.toFixed(2) : "—"}
+            ${money(open)}
           </div>
         </div>
 
         <div class="card">
           <div class="muted">High</div>
           <div class="value">
-            ${Number.isFinite(high) ? "₹" + high.toFixed(2) : "—"}
+            ${money(high)}
           </div>
         </div>
 
         <div class="card">
           <div class="muted">Low</div>
           <div class="value">
-            ${Number.isFinite(low) ? "₹" + low.toFixed(2) : "—"}
+            ${money(low)}
           </div>
         </div>
 
         <div class="card">
           <div class="muted">Previous Close</div>
           <div class="value">
-            ${Number.isFinite(close) ? "₹" + close.toFixed(2) : "—"}
+            ${money(close)}
           </div>
         </div>
 
         <div class="card">
           <div class="muted">Volume</div>
           <div class="value">
-            ${Number.isFinite(volume)
-              ? volume.toLocaleString("en-IN")
-              : "—"}
+            ${
+              Number.isFinite(volume)
+                ? numberFormat(volume)
+                : "—"
+            }
           </div>
         </div>
 
@@ -558,12 +622,36 @@ function stockPage(s) {
 
     <div class="section card">
 
-      <h2>Chart</h2>
+      <h2>Market Details</h2>
 
       <p class="muted">
-        Live chart integration will be connected after
-        the Angel One market-data backend is expanded.
+        Data is received from Angel One through the
+        Cloudflare Worker.
       </p>
+
+      <div style="margin-top:12px">
+
+        <div>
+          <b>Current Price:</b>
+          ${money(price)}
+        </div>
+
+        <div>
+          <b>Day High:</b>
+          ${money(high)}
+        </div>
+
+        <div>
+          <b>Day Low:</b>
+          ${money(low)}
+        </div>
+
+        <div>
+          <b>Previous Close:</b>
+          ${money(close)}
+        </div>
+
+      </div>
 
     </div>
 
@@ -721,42 +809,58 @@ function setupScreener() {
     });
 
     if (mode === "gainers") {
-      result = result.filter(x => Number(x[3]) > 0);
+      result = result.filter(
+        x => Number(x[3]) > 0
+      );
     }
 
     if (mode === "losers") {
-      result = result.filter(x => Number(x[3]) < 0);
+      result = result.filter(
+        x => Number(x[3]) < 0
+      );
     }
 
     table.innerHTML = tbl(result);
   }
 
-  search.addEventListener("input", render);
+  search.addEventListener(
+    "input",
+    render
+  );
 
   if (allBtn) {
 
-    allBtn.addEventListener("click", () => {
-      mode = "all";
-      render();
-    });
+    allBtn.addEventListener(
+      "click",
+      () => {
+        mode = "all";
+        render();
+      }
+    );
 
   }
 
   if (gainersBtn) {
 
-    gainersBtn.addEventListener("click", () => {
-      mode = "gainers";
-      render();
-    });
+    gainersBtn.addEventListener(
+      "click",
+      () => {
+        mode = "gainers";
+        render();
+      }
+    );
 
   }
 
   if (losersBtn) {
 
-    losersBtn.addEventListener("click", () => {
-      mode = "losers";
-      render();
-    });
+    losersBtn.addEventListener(
+      "click",
+      () => {
+        mode = "losers";
+        render();
+      }
+    );
 
   }
 }
@@ -811,7 +915,9 @@ function setupAdmin() {
         } else {
 
           const data =
-            await r.json().catch(() => ({}));
+            await r.json().catch(
+              () => ({})
+            );
 
           msg.textContent =
             data.error ||
@@ -883,9 +989,20 @@ function setupAdmin() {
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              t: document.getElementById("headline").value,
-              c: document.getElementById("category").value,
-              b: document.getElementById("body").value
+              t:
+                document.getElementById(
+                  "headline"
+                ).value,
+
+              c:
+                document.getElementById(
+                  "category"
+                ).value,
+
+              b:
+                document.getElementById(
+                  "body"
+                ).value
             })
           }
         );
@@ -897,7 +1014,6 @@ function setupAdmin() {
           await route();
 
           return;
-
         }
 
         if (!r.ok) {
@@ -906,7 +1022,6 @@ function setupAdmin() {
             "Publish failed.";
 
           return;
-
         }
 
         await loadNews();
@@ -936,98 +1051,4 @@ function renderCurrentPage() {
 
   const p =
     (location.hash || "#/")
-      .slice(2)
-      .split("/");
-
-  let h;
-
-  if (p[0] === "news") {
-
-    h = newsPage();
-
-  } else if (p[0] === "screener") {
-
-    h = screener();
-
-  } else if (p[0] === "stocks") {
-
-    h = tbl();
-
-  } else if (p[0] === "stock") {
-
-    h = stockPage(p[1]);
-
-  } else if (p[0] === "admin") {
-
-    h = admin();
-
-  } else {
-
-    h = home();
-
-  }
-
-  const appElement =
-    document.getElementById("app");
-
-  if (!appElement) {
-    console.error("Element #app not found.");
-    return;
-  }
-
-  appElement.innerHTML = h;
-
-  if (p[0] === "screener") {
-    setupScreener();
-  }
-
-  if (p[0] === "admin") {
-    setupAdmin();
-  }
-}
-
-/* =========================================================
-   ROUTER
-   ========================================================= */
-
-async function route() {
-
-  const p =
-    (location.hash || "#/")
-      .slice(2)
-      .split("/");
-
-  if (p[0] === "admin") {
-    await checkAdmin();
-  }
-
-  await loadNews();
-
-  /*
-    Get latest Angel One data before rendering.
-    If it fails, existing values remain as fallback.
-  */
-
-  await loadLiveMarket();
-
-  renderCurrentPage();
-}
-
-/* =========================================================
-   START
-   ========================================================= */
-
-addEventListener(
-  "hashchange",
-  route
-);
-
-route();
-
-/*
-  Start automatic Angel One refresh.
-  Every 10 seconds the frontend asks our
-  Cloudflare Worker for fresh market data.
-*/
-
-startMarketRefresh();
+      .slice(2
