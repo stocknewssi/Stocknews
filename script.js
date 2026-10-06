@@ -109,8 +109,13 @@ async function route(){
      const r=await fetch("/api/admin/login",{method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},
        body:JSON.stringify({password:adminPassword.value})
      });
-     if(r.ok){adminLoggedIn=true;route()}
-     else loginMsg.textContent="Wrong password";
+   if(r.ok){
+  adminLoggedIn=true;
+  route();
+}else{
+  const data=await r.json().catch(()=>({}));
+  loginMsg.textContent=data.error || `Login failed (${r.status})`;
+   }
    };
  }
 }
