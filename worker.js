@@ -241,15 +241,6 @@ async function getAngelPrices(env, request) {
    ========================================= */
 
 export default {
-if (url.pathname === "/api/ping" && request.method === "GET") {
-  return json({
-    ok: true,
-    angelApiKeyConfigured: !!env.ANGEL_API_KEY,
-    clientIdConfigured: !!env.ANGEL_CLIENT_ID,
-    pinConfigured: !!env.ANGEL_PIN,
-    totpConfigured: !!env.ANGEL_TOTP_SECRET
-  });
-}
   async fetch(request, env) {
 if (url.pathname === "/api/ping" && request.method === "GET") {
   return json({
