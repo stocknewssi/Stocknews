@@ -1,5 +1,5 @@
 const COOKIE = "stocknews_admin";
-
+const DEBUG_MARKER = "STOCKNEWS_DEBUG_123";
 function json(data, status = 200, extra = {}) {
   return new Response(JSON.stringify(data), {
     status,
