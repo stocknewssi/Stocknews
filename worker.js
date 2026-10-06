@@ -328,7 +328,7 @@ async function getAngelPrices(
           "X-ClientPublicIP":
             publicIP,
 
-          "X-MACAddress":
+          "X-MACaddress":
             "00:00:00:00:00:00"
         },
 
