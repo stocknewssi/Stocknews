@@ -1,5 +1,12 @@
 /* =========================================================
-   STOCKNEWS - LIVE ANGEL ONE FRONTEND
+   STOCKNEWS — PROFESSIONAL LIVE STOCK DASHBOARD
+   Angel One Backend + Admin + News + Screener
+   ========================================================= */
+
+"use strict";
+
+/* =========================================================
+   STOCK DATABASE / FALLBACK DATA
    ========================================================= */
 
 const stocks = [
@@ -16,21 +23,72 @@ let news = [];
 let adminLoggedIn = false;
 let liveLoading = false;
 let liveError = false;
+let lastMarketUpdate = null;
+let marketTimer = null;
 
 /* =========================================================
    HELPERS
    ========================================================= */
 
-const esc = x =>
-  String(x).replace(/[&<>'"]/g, m => ({
+const esc = value =>
+  String(value ?? "").replace(/[&<>'"]/g, char => ({
     "&": "&amp;",
     "<": "&lt;",
     ">": "&gt;",
     "'": "&#39;",
     '"': "&quot;"
-  }[m]));
+  }[char]));
 
-/* Convert live Angel data into our stock format */
+function money(value) {
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) return "—";
+
+  return "₹" + n.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function number(value) {
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) return "—";
+
+  return n.toLocaleString("en-IN");
+}
+
+function percent(value) {
+  const n = Number(value);
+
+  if (!Number.isFinite(n)) return "0.00%";
+
+  return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
+}
+
+function changeClass(value) {
+  return Number(value) >= 0 ? "up" : "down";
+}
+
+function changeIcon(value) {
+  return Number(value) >= 0 ? "▲" : "▼";
+}
+
+function stockLogo(symbol) {
+  const s = String(symbol || "").slice(0, 2).toUpperCase();
+  return s;
+}
+
+function getStock(symbol) {
+  return stocks.find(
+    x => String(x[0]).toUpperCase() === String(symbol).toUpperCase()
+  );
+}
+
+/* =========================================================
+   APPLY LIVE ANGEL ONE DATA
+   ========================================================= */
+
 function applyLivePrices(prices) {
   if (!Array.isArray(prices)) return;
 
@@ -42,27 +100,21 @@ function applyLivePrices(prices) {
       .trim()
       .toUpperCase();
 
-    const stock = stocks.find(x => x[0] === symbol);
+    const stock = getStock(symbol);
 
     if (!stock) return;
 
     const price = Number(p.price);
 
-    if (!Number.isFinite(price)) return;
-
-    /*
-      Backend currently gives price.
-      If change/changePercent is also supplied later,
-      this frontend will automatically use it.
-    */
-
-    stock[2] = price;
+    if (Number.isFinite(price)) {
+      stock[2] = price;
+    }
 
     if (p.changePercent !== undefined) {
-      const change = Number(p.changePercent);
+      const changePercent = Number(p.changePercent);
 
-      if (Number.isFinite(change)) {
-        stock[3] = change;
+      if (Number.isFinite(changePercent)) {
+        stock[3] = changePercent;
       }
     }
 
@@ -74,12 +126,33 @@ function applyLivePrices(prices) {
       }
     }
 
-    if (p.open !== undefined) stock[6] = Number(p.open);
-    if (p.high !== undefined) stock[7] = Number(p.high);
-    if (p.low !== undefined) stock[8] = Number(p.low);
-    if (p.close !== undefined) stock[9] = Number(p.close);
-    if (p.volume !== undefined) stock[10] = Number(p.volume);
+    if (p.open !== undefined) {
+      const value = Number(p.open);
+      if (Number.isFinite(value)) stock[6] = value;
+    }
+
+    if (p.high !== undefined) {
+      const value = Number(p.high);
+      if (Number.isFinite(value)) stock[7] = value;
+    }
+
+    if (p.low !== undefined) {
+      const value = Number(p.low);
+      if (Number.isFinite(value)) stock[8] = value;
+    }
+
+    if (p.close !== undefined) {
+      const value = Number(p.close);
+      if (Number.isFinite(value)) stock[9] = value;
+    }
+
+    if (p.volume !== undefined) {
+      const value = Number(p.volume);
+      if (Number.isFinite(value)) stock[10] = value;
+    }
   });
+
+  lastMarketUpdate = new Date();
 }
 
 /* =========================================================
@@ -91,17 +164,17 @@ async function loadLiveMarket() {
   liveError = false;
 
   try {
-    const r = await fetch("/api/market", {
+    const response = await fetch("/api/market", {
       method: "GET",
       credentials: "include",
       cache: "no-store"
     });
 
-    if (!r.ok) {
-      throw new Error(`Market API failed: ${r.status}`);
+    if (!response.ok) {
+      throw new Error(`Market API failed: ${response.status}`);
     }
 
-    const data = await r.json();
+    const data = await response.json();
 
     if (!data.success || !Array.isArray(data.prices)) {
       throw new Error(data.error || "Invalid market data");
@@ -110,11 +183,11 @@ async function loadLiveMarket() {
     applyLivePrices(data.prices);
 
     liveLoading = false;
+    liveError = false;
 
     return true;
-
-  } catch (e) {
-    console.error("Live market error:", e);
+  } catch (error) {
+    console.error("Live market error:", error);
 
     liveLoading = false;
     liveError = true;
@@ -123,29 +196,21 @@ async function loadLiveMarket() {
   }
 }
 
-/*
-  Refresh Angel One data every 10 seconds.
-
-  This does NOT expose any Angel API key or secret
-  because all credentials remain safely inside
-  the Cloudflare Worker.
-*/
-let marketTimer = null;
+/* =========================================================
+   AUTO MARKET REFRESH
+   ========================================================= */
 
 function startMarketRefresh() {
-
   if (marketTimer) {
     clearInterval(marketTimer);
   }
 
   marketTimer = setInterval(async () => {
-
     const ok = await loadLiveMarket();
 
     if (ok) {
       renderCurrentPage();
     }
-
   }, 10000);
 }
 
@@ -154,113 +219,40 @@ function startMarketRefresh() {
    ========================================================= */
 
 async function loadNews() {
-
   try {
-
-    const r = await fetch("/api/news", {
+    const response = await fetch("/api/news", {
       credentials: "include",
       cache: "no-store"
     });
 
-    if (r.ok) {
+    if (response.ok) {
+      const data = await response.json();
 
-      news = await r.json();
-
-      if (Array.isArray(news)) {
+      if (Array.isArray(data)) {
+        news = data;
         return;
       }
-
     }
-
-  } catch (e) {
-    console.error("News API error:", e);
+  } catch (error) {
+    console.error("News API error:", error);
   }
 
-  /*
-    Local fallback.
-    This is only used if Cloudflare KV/news API
-    is temporarily unavailable.
-  */
-
   news =
-    JSON.parse(localStorage.sn_news || "null") ||
+    JSON.parse(localStorage.getItem("sn_news") || "null") ||
     [
       {
         id: 1,
         t: "Indian market opens with mixed cues",
         c: "Market",
-        b: "Demo editorial summary."
+        b: "Market activity remains in focus as investors monitor global and domestic cues."
       },
       {
         id: 2,
         t: "Banking stocks remain in focus",
         c: "Banking",
-        b: "Demo summary for StockNews."
+        b: "Banking stocks continue to attract attention from market participants."
       }
     ];
-}
-
-/* =========================================================
-   STOCK TABLE
-   ========================================================= */
-
-function tbl(a = stocks) {
-
-  return `
-    <div class="table">
-      <table>
-
-        <tr>
-          <th>Stock</th>
-          <th>Price</th>
-          <th>Change</th>
-          <th>Sector</th>
-        </tr>
-
-        ${
-          a.map(x => {
-
-            const price = Number(x[2]) || 0;
-            const change = Number(x[3]) || 0;
-
-            return `
-              <tr>
-
-                <td>
-                  <a class="link" href="#/stock/${esc(x[0])}">
-                    ${esc(x[0])}
-                  </a>
-
-                  <div class="muted">
-                    ${esc(x[1])}
-                  </div>
-                </td>
-
-                <td>
-                  â‚¹${price.toLocaleString("en-IN", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
-                  })}
-                </td>
-
-                <td class="${change >= 0 ? "up" : "down"}">
-                  ${change >= 0 ? "+" : ""}
-                  ${change.toFixed(2)}%
-                </td>
-
-                <td>
-                  ${esc(x[4])}
-                </td>
-
-              </tr>
-            `;
-
-          }).join("")
-        }
-
-      </table>
-    </div>
-  `;
 }
 
 /* =========================================================
@@ -268,29 +260,254 @@ function tbl(a = stocks) {
    ========================================================= */
 
 function marketStatus() {
-
   if (liveLoading) {
     return `
-      <div class="section card">
-        <b>Data status:</b>
-        Connecting to Angel One...
+      <div class="status-card loading-status">
+        <span class="status-dot"></span>
+        <div>
+          <strong>Connecting to Angel One</strong>
+          <small>Fetching latest market data...</small>
+        </div>
       </div>
     `;
   }
 
   if (liveError) {
     return `
-      <div class="section card">
-        <b>Data status:</b>
-        Live market data temporarily unavailable.
+      <div class="status-card error-status">
+        <span class="status-dot"></span>
+        <div>
+          <strong>Live data unavailable</strong>
+          <small>Showing the latest available data.</small>
+        </div>
       </div>
     `;
   }
 
+  const time = lastMarketUpdate
+    ? lastMarketUpdate.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit"
+      })
+    : "Connecting";
+
   return `
-    <div class="section card">
-      <b>Data status:</b>
-      <span class="up">â— Live Angel One data</span>
+    <div class="status-card live-status">
+      <span class="status-dot"></span>
+      <div>
+        <strong>LIVE MARKET DATA</strong>
+        <small>Angel One • Updated ${esc(time)}</small>
+      </div>
+    </div>
+  `;
+}
+
+/* =========================================================
+   STOCK CARD
+   ========================================================= */
+
+function stockCard(stock) {
+  const symbol = stock[0];
+  const name = stock[1];
+  const price = Number(stock[2]) || 0;
+  const change = Number(stock[3]) || 0;
+
+  return `
+    <a class="stock-card" href="#/stock/${encodeURIComponent(symbol)}">
+
+      <div class="stock-card-top">
+
+        <div class="stock-logo">
+          ${esc(stockLogo(symbol))}
+        </div>
+
+        <div class="stock-name">
+          <strong>${esc(symbol)}</strong>
+          <span>${esc(name)}</span>
+        </div>
+
+        <div class="stock-arrow">
+          →
+        </div>
+
+      </div>
+
+      <div class="stock-price">
+        ${money(price)}
+      </div>
+
+      <div class="stock-card-bottom">
+
+        <span class="sector-pill">
+          ${esc(stock[4])}
+        </span>
+
+        <span class="${changeClass(change)} change-pill">
+          ${changeIcon(change)}
+          ${percent(change)}
+        </span>
+
+      </div>
+
+    </a>
+  `;
+}
+
+/* =========================================================
+   STOCK TABLE
+   ========================================================= */
+
+function tbl(list = stocks) {
+  return `
+    <div class="table-wrap">
+
+      <table class="stock-table">
+
+        <thead>
+          <tr>
+            <th>Stock</th>
+            <th>Price</th>
+            <th>Change</th>
+            <th>Sector</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+
+          ${
+            list.length
+              ? list.map(stock => {
+
+                  const symbol = stock[0];
+                  const name = stock[1];
+                  const price = Number(stock[2]) || 0;
+                  const change = Number(stock[3]) || 0;
+
+                  return `
+                    <tr>
+
+                      <td>
+                        <div class="table-stock">
+
+                          <div class="mini-logo">
+                            ${esc(stockLogo(symbol))}
+                          </div>
+
+                          <div>
+                            <a
+                              class="link"
+                              href="#/stock/${encodeURIComponent(symbol)}"
+                            >
+                              ${esc(symbol)}
+                            </a>
+
+                            <div class="muted">
+                              ${esc(name)}
+                            </div>
+                          </div>
+
+                        </div>
+                      </td>
+
+                      <td class="price-cell">
+                        ${money(price)}
+                      </td>
+
+                      <td>
+                        <span class="${changeClass(change)} table-change">
+                          ${changeIcon(change)}
+                          ${percent(change)}
+                        </span>
+                      </td>
+
+                      <td>
+                        <span class="sector-pill">
+                          ${esc(stock[4])}
+                        </span>
+                      </td>
+
+                      <td>
+                        <a
+                          class="view-btn"
+                          href="#/stock/${encodeURIComponent(symbol)}"
+                        >
+                          View
+                        </a>
+                      </td>
+
+                    </tr>
+                  `;
+                }).join("")
+              : `
+                <tr>
+                  <td colspan="5" class="empty-cell">
+                    No stocks found.
+                  </td>
+                </tr>
+              `
+          }
+
+        </tbody>
+
+      </table>
+
+    </div>
+  `;
+}
+
+/* =========================================================
+   MARKET SUMMARY CARDS
+   ========================================================= */
+
+function marketSummary() {
+  const total = stocks.length;
+
+  const gainers = stocks.filter(x => Number(x[3]) > 0).length;
+  const losers = stocks.filter(x => Number(x[3]) < 0).length;
+
+  const average =
+    stocks.reduce((sum, x) => sum + (Number(x[3]) || 0), 0) /
+    Math.max(total, 1);
+
+  return `
+    <div class="summary-grid">
+
+      <div class="summary-card blue-card">
+        <span class="summary-icon">📊</span>
+        <div>
+          <small>Total Stocks</small>
+          <strong>${total}</strong>
+        </div>
+      </div>
+
+      <div class="summary-card green-card">
+        <span class="summary-icon">▲</span>
+        <div>
+          <small>Gainers</small>
+          <strong>${gainers}</strong>
+        </div>
+      </div>
+
+      <div class="summary-card red-card">
+        <span class="summary-icon">▼</span>
+        <div>
+          <small>Losers</small>
+          <strong>${losers}</strong>
+        </div>
+      </div>
+
+      <div class="summary-card purple-card">
+        <span class="summary-icon">%</span>
+        <div>
+          <small>Average Move</small>
+          <strong class="${changeClass(average)}">
+            ${percent(average)}
+          </strong>
+        </div>
+      </div>
+
     </div>
   `;
 }
@@ -300,55 +517,224 @@ function marketStatus() {
    ========================================================= */
 
 function home() {
+  const sorted = stocks
+    .slice()
+    .sort((a, b) => Number(b[3]) - Number(a[3]));
+
+  const topGainers = stocks
+    .filter(x => Number(x[3]) > 0)
+    .sort((a, b) => Number(b[3]) - Number(a[3]))
+    .slice(0, 4);
+
+  const topLosers = stocks
+    .filter(x => Number(x[3]) < 0)
+    .sort((a, b) => Number(a[3]) - Number(b[3]))
+    .slice(0, 4);
 
   return `
-    <div>
+    <div class="dashboard-page">
 
-      <h1>Indian Stock Market News</h1>
+      <section class="hero">
 
-      <p class="muted">
-        Live Indian stock market data, news and screener.
-      </p>
+        <div class="hero-content">
 
-      <div class="ticker">
+          <span class="hero-badge">
+            ● LIVE MARKET
+          </span>
 
-        <div class="card">
-          <div class="muted">NIFTY 50</div>
-          <div class="value">â€”</div>
-          <div class="muted">Live index integration</div>
+          <h1>
+            Indian Stock Market
+            <span>Dashboard</span>
+          </h1>
+
+          <p>
+            Track Indian stocks, market movers, latest news
+            and live Angel One market data in one place.
+          </p>
+
+          <div class="hero-actions">
+            <a href="#/stocks" class="primary-btn">
+              Explore Stocks →
+            </a>
+
+            <a href="#/screener" class="secondary-btn">
+              Open Screener
+            </a>
+          </div>
+
         </div>
 
-        <div class="card">
-          <div class="muted">SENSEX</div>
-          <div class="value">â€”</div>
-          <div class="muted">Live index integration</div>
+        <div class="hero-visual">
+          <div class="hero-chart">
+            <div class="chart-line"></div>
+            <span>LIVE</span>
+          </div>
         </div>
 
-        <div class="card">
-          <div class="muted">BANK NIFTY</div>
-          <div class="value">â€”</div>
-          <div class="muted">Live index integration</div>
+      </section>
+
+      ${marketSummary()}
+
+      <section class="market-index-grid">
+
+        <div class="index-card">
+          <div>
+            <small>NIFTY 50</small>
+            <strong>—</strong>
+          </div>
+          <span class="index-placeholder">LIVE</span>
         </div>
 
-        <div class="card">
-          <div class="muted">INDIA VIX</div>
-          <div class="value">â€”</div>
-          <div class="muted">Live index integration</div>
+        <div class="index-card">
+          <div>
+            <small>SENSEX</small>
+            <strong>—</strong>
+          </div>
+          <span class="index-placeholder">LIVE</span>
         </div>
 
-      </div>
+        <div class="index-card">
+          <div>
+            <small>BANK NIFTY</small>
+            <strong>—</strong>
+          </div>
+          <span class="index-placeholder">LIVE</span>
+        </div>
 
-      <div class="section">
+        <div class="index-card">
+          <div>
+            <small>INDIA VIX</small>
+            <strong>—</strong>
+          </div>
+          <span class="index-placeholder">LIVE</span>
+        </div>
 
-        <h2>Top Movers</h2>
+      </section>
 
-        ${tbl(
-          stocks
-            .slice()
-            .sort((a, b) => Number(b[3]) - Number(a[3]))
-        )}
+      <section class="section-block">
 
-      </div>
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">MARKET WATCH</span>
+            <h2>Top Movers</h2>
+          </div>
+
+          <a href="#/stocks" class="section-link">
+            View all →
+          </a>
+        </div>
+
+        <div class="stock-card-grid">
+          ${
+            sorted
+              .slice(0, 6)
+              .map(stockCard)
+              .join("")
+          }
+        </div>
+
+      </section>
+
+      <section class="two-column">
+
+        <div class="panel">
+
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow green-text">TOP GAINERS</span>
+              <h2>Leading Stocks</h2>
+            </div>
+          </div>
+
+          <div class="compact-list">
+            ${
+              topGainers.length
+                ? topGainers.map(stock => `
+                    <a
+                      class="compact-stock"
+                      href="#/stock/${encodeURIComponent(stock[0])}"
+                    >
+                      <span class="compact-logo">
+                        ${esc(stockLogo(stock[0]))}
+                      </span>
+
+                      <span class="compact-info">
+                        <strong>${esc(stock[0])}</strong>
+                        <small>${esc(stock[1])}</small>
+                      </span>
+
+                      <span class="compact-price">
+                        ${money(stock[2])}
+                        <b class="up">
+                          ${percent(stock[3])}
+                        </b>
+                      </span>
+                    </a>
+                  `).join("")
+                : `<p class="muted">No gainers.</p>`
+            }
+          </div>
+
+        </div>
+
+        <div class="panel">
+
+          <div class="section-heading">
+            <div>
+              <span class="eyebrow red-text">TOP LOSERS</span>
+              <h2>Under Pressure</h2>
+            </div>
+          </div>
+
+          <div class="compact-list">
+            ${
+              topLosers.length
+                ? topLosers.map(stock => `
+                    <a
+                      class="compact-stock"
+                      href="#/stock/${encodeURIComponent(stock[0])}"
+                    >
+                      <span class="compact-logo">
+                        ${esc(stockLogo(stock[0]))}
+                      </span>
+
+                      <span class="compact-info">
+                        <strong>${esc(stock[0])}</strong>
+                        <small>${esc(stock[1])}</small>
+                      </span>
+
+                      <span class="compact-price">
+                        ${money(stock[2])}
+                        <b class="down">
+                          ${percent(stock[3])}
+                        </b>
+                      </span>
+                    </a>
+                  `).join("")
+                : `<p class="muted">No losers.</p>`
+            }
+          </div>
+
+        </div>
+
+      </section>
+
+      <section class="section-block">
+
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">STOCK MARKET</span>
+            <h2>All Stocks</h2>
+          </div>
+
+          <a href="#/screener" class="section-link">
+            Screen stocks →
+          </a>
+        </div>
+
+        ${tbl(stocks)}
+
+      </section>
 
       ${marketStatus()}
 
@@ -361,39 +747,64 @@ function home() {
    ========================================================= */
 
 function newsPage() {
-
   return `
-    <h1>Latest News</h1>
+    <div class="page-header">
 
-    <div class="grid">
+      <div>
+        <span class="eyebrow">STOCKNEWS</span>
+        <h1>Latest Market News</h1>
+        <p class="muted">
+          Latest market updates and editorial summaries.
+        </p>
+      </div>
+
+      <span class="live-badge">
+        ● LIVE
+      </span>
+
+    </div>
+
+    <div class="news-grid">
 
       ${
         news.length
           ? news.map(n => `
-              <article class="card">
+              <article class="news-card">
 
-                <span class="tag">
-                  ${esc(n.c)}
-                </span>
+                <div class="news-top">
+
+                  <span class="tag">
+                    ${esc(n.c || "Market")}
+                  </span>
+
+                  <span class="news-dot">
+                    ●
+                  </span>
+
+                </div>
 
                 <h3>
                   ${esc(n.t)}
                 </h3>
 
-                <p class="muted">
+                <p>
                   ${esc(n.b)}
                 </p>
 
+                <div class="news-footer">
+                  <span>StockNews</span>
+                  <span>→</span>
+                </div>
+
               </article>
             `).join("")
-          :
-            `
-              <div class="card">
-                <p class="muted">
-                  No news available.
-                </p>
+          : `
+              <div class="empty-card">
+                <div class="empty-icon">📰</div>
+                <h3>No news available</h3>
+                <p>Please check again later.</p>
               </div>
-            `
+          `
       }
 
     </div>
@@ -405,49 +816,70 @@ function newsPage() {
    ========================================================= */
 
 function screener() {
-
   return `
-    <h1>Stock Screener</h1>
+    <div class="page-header">
 
-    <p class="muted">
-      Live stocks powered by Angel One market data.
-    </p>
+      <div>
+        <span class="eyebrow">ANALYSIS TOOL</span>
+        <h1>Stock Screener</h1>
+        <p class="muted">
+          Search and filter stocks using live market data.
+        </p>
+      </div>
 
-    <input
-      id="q"
-      class="search"
-      placeholder="Search stock..."
-      autocomplete="off"
-    >
+    </div>
 
-    <div class="section">
+    <div class="screener-toolbar">
 
-      <div class="card">
+      <div class="search-box">
 
-        <b>Market Filters</b>
+        <span>⌕</span>
 
-        <div style="margin-top:12px">
+        <input
+          id="q"
+          type="search"
+          placeholder="Search stock, company or sector..."
+          autocomplete="off"
+        >
 
-          <button type="button" id="allFilter">
-            All
-          </button>
+      </div>
 
-          <button type="button" id="gainersFilter">
-            Gainers
-          </button>
+      <div class="filter-buttons">
 
-          <button type="button" id="losersFilter">
-            Losers
-          </button>
+        <button
+          type="button"
+          class="filter-btn active"
+          id="allFilter"
+        >
+          All
+        </button>
 
-        </div>
+        <button
+          type="button"
+          class="filter-btn"
+          id="gainersFilter"
+        >
+          🟢 Gainers
+        </button>
+
+        <button
+          type="button"
+          class="filter-btn"
+          id="losersFilter"
+        >
+          🔴 Losers
+        </button>
 
       </div>
 
     </div>
 
-    <div id="t" class="section">
-      ${tbl()}
+    <div class="section-block">
+
+      <div id="t">
+        ${tbl()}
+      </div>
+
     </div>
 
     ${marketStatus()}
@@ -455,18 +887,26 @@ function screener() {
 }
 
 /* =========================================================
-   STOCK DETAIL PAGE
+   STOCK DETAIL
    ========================================================= */
 
-function stockPage(s) {
+function stockPage(symbol) {
+  const decoded = decodeURIComponent(symbol || "");
 
-  const x = stocks.find(
-    a => String(a[0]).toUpperCase() === String(s).toUpperCase()
-  );
+  const x = getStock(decoded);
 
   if (!x) {
     return `
-      <h1>Stock not found</h1>
+      <div class="empty-card">
+        <div class="empty-icon">🔎</div>
+        <h1>Stock not found</h1>
+        <p>
+          We could not find the requested stock.
+        </p>
+        <a href="#/stocks" class="primary-btn">
+          Back to Stocks
+        </a>
+      </div>
     `;
   }
 
@@ -480,100 +920,165 @@ function stockPage(s) {
   const volume = Number(x[10]);
 
   return `
+    <div class="stock-detail-page">
 
-    <h1>${esc(x[1])}</h1>
+      <a href="#/stocks" class="back-link">
+        ← Back to stocks
+      </a>
 
-    <p class="muted">
-      ${esc(x[0])} Â· ${esc(x[4])}
-    </p>
+      <section class="stock-detail-hero">
 
-    <div class="card">
+        <div class="detail-title">
 
-      <div class="value">
+          <div class="detail-logo">
+            ${esc(stockLogo(x[0]))}
+          </div>
 
-        â‚¹${price.toLocaleString("en-IN", {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        })}
+          <div>
+            <span class="eyebrow">
+              ${esc(x[4])}
+            </span>
 
-      </div>
+            <h1>
+              ${esc(x[1])}
+            </h1>
 
-      <div class="${change >= 0 ? "up" : "down"}">
+            <p>
+              ${esc(x[0])}
+            </p>
+          </div>
 
-        ${change >= 0 ? "+" : ""}
-        ${change.toFixed(2)}%
+        </div>
 
-      </div>
+        <div class="detail-price">
 
-      <div class="muted">
-        Live Angel One price
-      </div>
+          <span class="price-label">
+            Current Price
+          </span>
+
+          <strong>
+            ${money(price)}
+          </strong>
+
+          <span class="${changeClass(change)} detail-change">
+            ${changeIcon(change)}
+            ${percent(change)}
+          </span>
+
+        </div>
+
+      </section>
+
+      <section class="detail-stat-grid">
+
+        <div class="detail-stat">
+          <small>OPEN</small>
+          <strong>
+            ${Number.isFinite(open) ? money(open) : "—"}
+          </strong>
+        </div>
+
+        <div class="detail-stat">
+          <small>DAY HIGH</small>
+          <strong class="up">
+            ${Number.isFinite(high) ? money(high) : "—"}
+          </strong>
+        </div>
+
+        <div class="detail-stat">
+          <small>DAY LOW</small>
+          <strong class="down">
+            ${Number.isFinite(low) ? money(low) : "—"}
+          </strong>
+        </div>
+
+        <div class="detail-stat">
+          <small>PREVIOUS CLOSE</small>
+          <strong>
+            ${Number.isFinite(close) ? money(close) : "—"}
+          </strong>
+        </div>
+
+        <div class="detail-stat">
+          <small>VOLUME</small>
+          <strong>
+            ${Number.isFinite(volume) ? number(volume) : "—"}
+          </strong>
+        </div>
+
+      </section>
+
+      <section class="chart-placeholder">
+
+        <div class="chart-header">
+
+          <div>
+            <span class="eyebrow">PRICE ACTION</span>
+            <h2>Market Chart</h2>
+          </div>
+
+          <span class="chart-live">
+            ● LIVE
+          </span>
+
+        </div>
+
+        <div class="fake-chart">
+
+          <div class="fake-grid"></div>
+
+          <svg
+            viewBox="0 0 900 250"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <polyline
+              points="
+                0,200
+                80,180
+                150,190
+                220,135
+                300,160
+                370,110
+                440,125
+                520,70
+                600,100
+                680,55
+                760,80
+                840,35
+                900,50
+              "
+              fill="none"
+              stroke="currentColor"
+              stroke-width="4"
+            />
+          </svg>
+
+          <div class="chart-note">
+            Live chart integration can be connected to the expanded
+            Angel One market-data backend.
+          </div>
+
+        </div>
+
+      </section>
+
+      <section class="section-block">
+
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">STOCK OVERVIEW</span>
+            <h2>Trading Information</h2>
+          </div>
+        </div>
+
+        ${tbl([x])}
+
+      </section>
+
+      ${marketStatus()}
 
     </div>
-
-    <div class="section">
-
-      <div class="grid">
-
-        <div class="card">
-          <div class="muted">Open</div>
-          <div class="value">
-            ${Number.isFinite(open) ? "â‚¹" + open.toFixed(2) : "â€”"}
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="muted">High</div>
-          <div class="value">
-            ${Number.isFinite(high) ? "â‚¹" + high.toFixed(2) : "â€”"}
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="muted">Low</div>
-          <div class="value">
-            ${Number.isFinite(low) ? "â‚¹" + low.toFixed(2) : "â€”"}
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="muted">Previous Close</div>
-          <div class="value">
-            ${Number.isFinite(close) ? "â‚¹" + close.toFixed(2) : "â€”"}
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="muted">Volume</div>
-          <div class="value">
-            ${Number.isFinite(volume)
-              ? volume.toLocaleString("en-IN")
-              : "â€”"}
-          </div>
-        </div>
-
-      </div>
-
-    </div>
-
-    <div class="section card">
-
-      <h2>Chart</h2>
-
-      <p class="muted">
-        Live chart integration will be connected after
-        the Angel One market-data backend is expanded.
-      </p>
-
-    </div>
-
-    <div class="section">
-
-      ${tbl([x])}
-
-    </div>
-
-    ${marketStatus()}
   `;
 }
 
@@ -582,84 +1087,191 @@ function stockPage(s) {
    ========================================================= */
 
 function adminLogin() {
-
   return `
-    <h1>Admin Login</h1>
+    <div class="auth-page">
 
-    <div class="card">
+      <div class="auth-card">
 
-      <form id="loginForm">
+        <div class="auth-logo">
+          SN
+        </div>
 
-        <input
-          id="adminPassword"
-          type="password"
-          required
-          placeholder="Admin password"
-        >
+        <span class="eyebrow">
+          STOCKNEWS ADMIN
+        </span>
 
-        <button type="submit">
-          Login
-        </button>
+        <h1>Welcome Back</h1>
 
-        <p id="loginMsg" class="muted"></p>
+        <p class="muted">
+          Sign in to manage market news.
+        </p>
 
-      </form>
+        <form id="loginForm">
+
+          <label>
+            Admin Password
+          </label>
+
+          <input
+            id="adminPassword"
+            type="password"
+            required
+            placeholder="Enter admin password"
+            autocomplete="current-password"
+          >
+
+          <button
+            type="submit"
+            class="primary-btn full-btn"
+          >
+            Login →
+          </button>
+
+          <p id="loginMsg" class="form-message"></p>
+
+        </form>
+
+      </div>
 
     </div>
   `;
 }
 
 /* =========================================================
-   ADMIN
+   ADMIN DASHBOARD
    ========================================================= */
 
 function admin() {
-
   if (!adminLoggedIn) {
     return adminLogin();
   }
 
   return `
+    <div class="admin-page">
 
-    <h1>Admin</h1>
+      <div class="page-header">
 
-    <div class="card">
+        <div>
+          <span class="eyebrow">CONTROL PANEL</span>
+          <h1>Admin Dashboard</h1>
+          <p class="muted">
+            Publish and manage StockNews market updates.
+          </p>
+        </div>
 
-      <button id="logoutBtn" type="button">
-        Logout
-      </button>
-
-      <form id="f">
-
-        <input
-          id="headline"
-          required
-          placeholder="Headline"
+        <button
+          id="logoutBtn"
+          type="button"
+          class="danger-btn"
         >
-
-        <select id="category">
-
-          <option>Market</option>
-          <option>Banking</option>
-          <option>IT</option>
-          <option>IPO</option>
-          <option>Corporate</option>
-
-        </select>
-
-        <textarea
-          id="body"
-          required
-          placeholder="Original summary"
-        ></textarea>
-
-        <button type="submit">
-          Publish
+          Logout
         </button>
 
-      </form>
+      </div>
 
-      <p id="adminMsg" class="muted"></p>
+      <div class="admin-grid">
+
+        <div class="admin-card">
+
+          <div class="admin-card-header">
+            <span class="admin-icon">📰</span>
+            <div>
+              <h2>Publish News</h2>
+              <p>Create a new market update.</p>
+            </div>
+          </div>
+
+          <form id="f">
+
+            <label for="headline">
+              Headline
+            </label>
+
+            <input
+              id="headline"
+              required
+              placeholder="Enter news headline"
+            >
+
+            <label for="category">
+              Category
+            </label>
+
+            <select id="category">
+
+              <option>Market</option>
+              <option>Banking</option>
+              <option>IT</option>
+              <option>IPO</option>
+              <option>Corporate</option>
+              <option>Stocks</option>
+
+            </select>
+
+            <label for="body">
+              Summary
+            </label>
+
+            <textarea
+              id="body"
+              required
+              rows="7"
+              placeholder="Write an original market summary..."
+            ></textarea>
+
+            <button
+              type="submit"
+              class="primary-btn"
+            >
+              Publish News →
+            </button>
+
+            <p
+              id="adminMsg"
+              class="form-message"
+            ></p>
+
+          </form>
+
+        </div>
+
+        <div class="admin-side-card">
+
+          <div class="admin-icon">📊</div>
+
+          <h2>Dashboard Status</h2>
+
+          <div class="admin-status-row">
+            <span>Market API</span>
+            <b class="${liveError ? "down" : "up"}">
+              ${liveError ? "Offline" : "Connected"}
+            </b>
+          </div>
+
+          <div class="admin-status-row">
+            <span>News API</span>
+            <b class="up">
+              Ready
+            </b>
+          </div>
+
+          <div class="admin-status-row">
+            <span>Stocks</span>
+            <b>
+              ${stocks.length}
+            </b>
+          </div>
+
+          <div class="admin-status-row">
+            <span>News Items</span>
+            <b>
+              ${news.length}
+            </b>
+          </div>
+
+        </div>
+
+      </div>
 
     </div>
   `;
@@ -670,31 +1282,32 @@ function admin() {
    ========================================================= */
 
 async function checkAdmin() {
-
   try {
-
-    const r = await fetch("/api/admin/check", {
+    const response = await fetch("/api/admin/check", {
       credentials: "include",
       cache: "no-store"
     });
 
-    adminLoggedIn =
-      r.ok &&
-      (await r.json()).admin === true;
+    if (!response.ok) {
+      adminLoggedIn = false;
+      return;
+    }
 
-  } catch (e) {
+    const data = await response.json();
 
+    adminLoggedIn = data.admin === true;
+
+  } catch (error) {
+    console.error("Admin check error:", error);
     adminLoggedIn = false;
-
   }
 }
 
 /* =========================================================
-   SCREENER FILTER
+   SCREENER EVENTS
    ========================================================= */
 
 function setupScreener() {
-
   const search = document.getElementById("q");
   const table = document.getElementById("t");
 
@@ -706,26 +1319,43 @@ function setupScreener() {
 
   let mode = "all";
 
+  const buttons = [
+    allBtn,
+    gainersBtn,
+    losersBtn
+  ].filter(Boolean);
+
+  function setActive(button) {
+    buttons.forEach(btn =>
+      btn.classList.remove("active")
+    );
+
+    if (button) {
+      button.classList.add("active");
+    }
+  }
+
   function render() {
+    const query = search.value.trim().toLowerCase();
 
-    const query =
-      search.value.trim().toLowerCase();
-
-    let result = stocks.filter(x => {
-
+    let result = stocks.filter(stock => {
       const text =
-        `${x[0]} ${x[1]} ${x[4]}`.toLowerCase();
+        `${stock[0]} ${stock[1]} ${stock[4]}`
+          .toLowerCase();
 
       return text.includes(query);
-
     });
 
     if (mode === "gainers") {
-      result = result.filter(x => Number(x[3]) > 0);
+      result = result.filter(
+        stock => Number(stock[3]) > 0
+      );
     }
 
     if (mode === "losers") {
-      result = result.filter(x => Number(x[3]) < 0);
+      result = result.filter(
+        stock => Number(stock[3]) < 0
+      );
     }
 
     table.innerHTML = tbl(result);
@@ -734,30 +1364,27 @@ function setupScreener() {
   search.addEventListener("input", render);
 
   if (allBtn) {
-
     allBtn.addEventListener("click", () => {
       mode = "all";
+      setActive(allBtn);
       render();
     });
-
   }
 
   if (gainersBtn) {
-
     gainersBtn.addEventListener("click", () => {
       mode = "gainers";
+      setActive(gainersBtn);
       render();
     });
-
   }
 
   if (losersBtn) {
-
     losersBtn.addEventListener("click", () => {
       mode = "losers";
+      setActive(losersBtn);
       render();
     });
-
   }
 }
 
@@ -774,21 +1401,22 @@ function setupAdmin() {
 
     if (!loginForm) return;
 
-    loginForm.onsubmit = async e => {
+    loginForm.onsubmit = async event => {
 
-      e.preventDefault();
+      event.preventDefault();
 
-      const msg =
+      const message =
         document.getElementById("loginMsg");
 
       const password =
         document.getElementById("adminPassword");
 
-      msg.textContent = "Logging in...";
+      message.textContent =
+        "Logging in...";
 
       try {
 
-        const r = await fetch(
+        const response = await fetch(
           "/api/admin/login",
           {
             method: "POST",
@@ -802,7 +1430,7 @@ function setupAdmin() {
           }
         );
 
-        if (r.ok) {
+        if (response.ok) {
 
           adminLoggedIn = true;
 
@@ -811,21 +1439,23 @@ function setupAdmin() {
         } else {
 
           const data =
-            await r.json().catch(() => ({}));
+            await response
+              .json()
+              .catch(() => ({}));
 
-          msg.textContent =
+          message.textContent =
             data.error ||
-            `Login failed (${r.status})`;
-
+            `Login failed (${response.status})`;
         }
 
-      } catch (e) {
+      } catch (error) {
 
-        msg.textContent =
+        console.error(error);
+
+        message.textContent =
           "Login request failed.";
 
       }
-
     };
 
     return;
@@ -841,6 +1471,8 @@ function setupAdmin() {
 
     logoutBtn.onclick = async () => {
 
+      logoutBtn.disabled = true;
+
       try {
 
         await fetch(
@@ -851,30 +1483,31 @@ function setupAdmin() {
           }
         );
 
-      } catch (e) {}
+      } catch (error) {
+        console.error(error);
+      }
 
       adminLoggedIn = false;
 
       await route();
-
     };
-
   }
 
   if (form) {
 
-    form.onsubmit = async e => {
+    form.onsubmit = async event => {
 
-      e.preventDefault();
+      event.preventDefault();
 
-      const msg =
+      const message =
         document.getElementById("adminMsg");
 
-      msg.textContent = "Publishing...";
+      message.textContent =
+        "Publishing...";
 
       try {
 
-        const r = await fetch(
+        const response = await fetch(
           "/api/admin/news",
           {
             method: "POST",
@@ -883,107 +1516,142 @@ function setupAdmin() {
               "Content-Type": "application/json"
             },
             body: JSON.stringify({
-              t: document.getElementById("headline").value,
+              t: document.getElementById("headline").value.trim(),
               c: document.getElementById("category").value,
-              b: document.getElementById("body").value
+              b: document.getElementById("body").value.trim()
             })
           }
         );
 
-        if (r.status === 401) {
+        if (response.status === 401) {
 
           adminLoggedIn = false;
 
           await route();
 
           return;
-
         }
 
-        if (!r.ok) {
+        if (!response.ok) {
 
-          msg.textContent =
+          const data =
+            await response
+              .json()
+              .catch(() => ({}));
+
+          message.textContent =
+            data.error ||
             "Publish failed.";
 
           return;
-
         }
 
         await loadNews();
 
         form.reset();
 
-        msg.textContent =
-          "Published successfully.";
+        message.textContent =
+          "✓ Published successfully.";
 
-      } catch (e) {
+      } catch (error) {
 
-        msg.textContent =
+        console.error(error);
+
+        message.textContent =
           "Publish request failed.";
 
       }
-
     };
-
   }
 }
 
 /* =========================================================
-   CURRENT PAGE RENDER
+   PAGE RENDERER
    ========================================================= */
 
 function renderCurrentPage() {
 
-  const p =
-    (location.hash || "#/")
+  const hash =
+    location.hash || "#/";
+
+  const parts =
+    hash
       .slice(2)
-      .split("/");
+      .split("/")
+      .filter(Boolean);
 
-  let h;
+  const page =
+    parts[0] || "home";
 
-  if (p[0] === "news") {
+  let html;
 
-    h = newsPage();
+  switch (page) {
 
-  } else if (p[0] === "screener") {
+    case "news":
+      html = newsPage();
+      break;
 
-    h = screener();
+    case "screener":
+      html = screener();
+      break;
 
-  } else if (p[0] === "stocks") {
+    case "stocks":
+      html = `
+        <div class="page-header">
+          <div>
+            <span class="eyebrow">MARKET UNIVERSE</span>
+            <h1>All Stocks</h1>
+            <p class="muted">
+              Browse available stocks and live market movement.
+            </p>
+          </div>
+        </div>
 
-    h = tbl();
+        <div class="section-block">
+          ${tbl()}
+        </div>
 
-  } else if (p[0] === "stock") {
+        ${marketStatus()}
+      `;
+      break;
 
-    h = stockPage(p[1]);
+    case "stock":
+      html = stockPage(parts[1]);
+      break;
 
-  } else if (p[0] === "admin") {
+    case "admin":
+      html = admin();
+      break;
 
-    h = admin();
-
-  } else {
-
-    h = home();
-
+    default:
+      html = home();
+      break;
   }
 
-  const appElement =
+  const app =
     document.getElementById("app");
 
-  if (!appElement) {
-    console.error("Element #app not found.");
+  if (!app) {
+    console.error(
+      "Element #app not found."
+    );
     return;
   }
 
-  appElement.innerHTML = h;
+  app.innerHTML = html;
 
-  if (p[0] === "screener") {
+  if (page === "screener") {
     setupScreener();
   }
 
-  if (p[0] === "admin") {
+  if (page === "admin") {
     setupAdmin();
   }
+
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth"
+  });
 }
 
 /* =========================================================
@@ -992,21 +1660,23 @@ function renderCurrentPage() {
 
 async function route() {
 
-  const p =
-    (location.hash || "#/")
-      .slice(2)
-      .split("/");
+  const hash =
+    location.hash || "#/";
 
-  if (p[0] === "admin") {
+  const parts =
+    hash
+      .slice(2)
+      .split("/")
+      .filter(Boolean);
+
+  const page =
+    parts[0] || "home";
+
+  if (page === "admin") {
     await checkAdmin();
   }
 
   await loadNews();
-
-  /*
-    Get latest Angel One data before rendering.
-    If it fails, existing values remain as fallback.
-  */
 
   await loadLiveMarket();
 
@@ -1014,20 +1684,54 @@ async function route() {
 }
 
 /* =========================================================
-   START
+   GLOBAL HASH ROUTER
    ========================================================= */
 
-addEventListener(
+window.addEventListener(
   "hashchange",
   route
 );
 
-route();
+/* =========================================================
+   INITIAL START
+   ========================================================= */
 
-/*
-  Start automatic Angel One refresh.
-  Every 10 seconds the frontend asks our
-  Cloudflare Worker for fresh market data.
-*/
+(async function init() {
 
-startMarketRefresh();
+  try {
+
+    await route();
+
+  } catch (error) {
+
+    console.error(
+      "Application startup error:",
+      error
+    );
+
+    const app =
+      document.getElementById("app");
+
+    if (app) {
+
+      app.innerHTML = `
+        <div class="empty-card">
+          <div class="empty-icon">⚠️</div>
+          <h1>Something went wrong</h1>
+          <p>
+            Please refresh the page and try again.
+          </p>
+          <button
+            class="primary-btn"
+            onclick="location.reload()"
+          >
+            Refresh
+          </button>
+        </div>
+      `;
+    }
+  }
+
+  startMarketRefresh();
+
+})();
