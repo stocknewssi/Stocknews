@@ -1793,7 +1793,7 @@ async function setupStockCandles(symbol, exchange) {
   async function loadInterval(interval) {
     activeInterval = interval;
     const seq = ++requestSequence;
-    host.querySelectorAll("[data-chart-interval]").forEach(button => button.classList.toggle("active", button.dataset.chartInterval === interval));
+    document.querySelectorAll(".stock-chart-section [data-chart-interval]").forEach(button => button.classList.toggle("active", button.dataset.chartInterval === interval));
     status.textContent = "Loading " + interval.replaceAll("_", " ").toLowerCase() + " candles…";
     try {
       const params = new URLSearchParams({ symbol, exchange, interval });
