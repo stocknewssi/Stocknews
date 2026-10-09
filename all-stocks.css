@@ -40,3 +40,12 @@
 .directory-error{color:#b93848}.directory-spinner{width:24px;height:24px;border:3px solid #dbe7f8;border-top-color:#2764c9;border-radius:50%;animation:directory-spin .8s linear infinite}
 @keyframes directory-spin{to{transform:rotate(360deg)}}
 @media(max-width:700px){.market-hero{align-items:flex-start;flex-direction:column;padding:23px 20px;gap:17px}.market-live-chip{white-space:normal}.directory-toolbar{grid-template-columns:1fr 1fr}.directory-search{grid-column:1/-1}.directory-refresh{grid-column:1/-1}.directory-stats{gap:8px}.directory-stats>div{padding:14px 12px}.directory-stats strong{font-size:20px}.directory-stats span{font-size:10px}.directory-table-head{padding:18px}.directory-pagination{align-items:flex-start;flex-direction:column;padding:15px}.directory-pagination>div{width:100%}.directory-pagination button{flex:1}.directory-disclaimer{padding:0 16px 18px}}
+
+/* Real historical candlestick chart */
+.stock-chart-section{overflow:hidden}
+.chart-toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.chart-toolbar button{border:1px solid #dbe3ee;background:#fff;color:#334155;border-radius:8px;padding:7px 13px;font-weight:600;cursor:pointer}
+.chart-toolbar button:hover,.chart-toolbar button.active{background:#e8f2ff;border-color:#93c5fd;color:#1d4ed8}
+.stock-candle-chart{width:100%;min-height:300px;height:330px;background:#fff;border:1px solid #edf1f6;border-radius:10px;overflow:hidden}
+.stock-chart-section .chart-note{color:#64748b;font-size:12px;margin-top:10px}
+@media(max-width:600px){.stock-candle-chart{height:280px;min-height:280px}.chart-toolbar{gap:6px}.chart-toolbar button{padding:7px 10px}}
