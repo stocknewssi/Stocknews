@@ -429,6 +429,8 @@ p{
  
 
 
+}
+
 /* Sector cards and enhanced screener controls */
 .sector-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .sector-card{display:flex;flex-direction:column;gap:10px;min-height:145px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--card);transition:transform .18s ease,border-color .18s ease}
