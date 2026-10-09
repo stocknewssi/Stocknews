@@ -178,7 +178,6 @@ async function generateTOTP(secret) {
   const code =
     ((signature[offset] & 0x7f) << 24) |
     ((signature[offset + 1] & 0xff) << 16) |    ((signature[offset + 2] & 0xff) << 8) |    (signature[offset + 3] & 0xff);
-
   return String(
     code % 1000000
   ).padStart(6, "0");
@@ -353,12 +352,11 @@ async function getAngelQuotes(env, request, requestedSymbols) {
         "X-ClientPublicIP": publicIP,
         "X-MACAddress": "00:00:00:00:00:00"
       },
-      body: JSON.stringify({ mode: "LTP", exchangeTokens })
+      body: JSON.stringify({ mode: "FULL", exchangeTokens })
     }
   );
   const result = await response.json();  if (!response.ok || !result.status) {
-    throw new Error(result.message || "Angel One batch quote request failed");
-  }
+    throw new Error(result.message || "Angel One batch quote request failed");  }
 
   const fetched = result.data?.fetched || [];
   return fetched.map(item => {
@@ -537,8 +535,7 @@ export default {
 
         if (
           body.password !==
-          env.ADMIN_PASSWORD
-        ) {
+          env.ADMIN_PASSWORD        ) {
 
           return json(
             {
