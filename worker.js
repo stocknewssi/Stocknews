@@ -474,7 +474,8 @@ export default {
           return json({ success: false, error: "Valid symbol and interval are required" }, 400);
         }
         const master = await getScripMaster(env);
-        const instrument = master.find(x => x.symbol.toUpperCase() === symbol || x.tradingSymbol.toUpperCase() === symbol);
+        const requestedExchange = String(url.searchParams.get("exchange") || "").trim().toUpperCase();
+        const instrument = master.find(x => (!requestedExchange || x.exchange === requestedExchange) && (x.symbol.toUpperCase() === symbol || x.tradingSymbol.toUpperCase() === symbol));
         if (!instrument) return json({ success: false, error: "Stock not found in instrument master" }, 404);
         const to = new Date();
         const from = new Date(to.getTime() - (interval === "ONE_DAY" ? 180 : 7) * 86400000);
