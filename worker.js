@@ -177,10 +177,7 @@ async function generateTOTP(secret) {
 
   const code =
     ((signature[offset] & 0x7f) << 24) |
-    ((signature[offset + 1] & 0xff) << 16) |
-    ((signature[offset + 2] & 0xff) << 8) |
-    (signature[offset + 3] & 0xff);
-
+    ((signature[offset + 1] & 0xff) << 16) |    ((signature[offset + 2] & 0xff) << 8) |    (signature[offset + 3] & 0xff);
   return String(
     code % 1000000
   ).padStart(6, "0");
@@ -279,104 +276,110 @@ async function angelLogin(env) {
 }
 
 /* =========================================
-   ANGEL ONE — GET LTP DATA
-   SBIN TEST
+   FULL NSE/BSE EQUITY MASTER + BATCH QUOTES
    ========================================= */
 
-async function getAngelPrices(
-  env,
-  request
-) {
-  const jwt =
-    await angelLogin(env);
+async function getScripMaster(env) {
+  const cacheKey = "angel_scrip_master_v1";
+  try {
+    const cached = await env.STOCKNEWS_KV.get(cacheKey, "json");
+    if (Array.isArray(cached) && cached.length) return cached;
+  } catch (_) {}
 
-  const publicIP =
-    request.headers.get(
-      "CF-Connecting-IP"
-    ) || "127.0.0.1";
+  const response = await fetch(
+    "https://margincalculator.angelone.in/OpenAPI_File/files/OpenAPIScripMaster.json",
+    { headers: { "Accept": "application/json" } }
+  );
+  if (!response.ok) throw new Error("Could not download Angel One instrument master");
+  const raw = await response.json();
 
-  const response =
-    await fetch(
-      "https://apiconnect.angelone.in/order-service/rest/secure/angelbroking/order/v1/getLtpData",
-      {
-        method: "POST",
+  const equities = raw.filter(item => {
+    const exchange = String(item.exch_seg || "").toUpperCase();
+    const symbol = String(item.symbol || "");
+    const type = String(item.instrumenttype || "").trim().toUpperCase();
+    const token = String(item.token || "");
+    if (!["NSE", "BSE"].includes(exchange) || !token || !symbol) return false;
+    if (type && type !== "EQ") return false;
+    if (/-(FUT|CE|PE)$/.test(symbol)) return false;
+    if (exchange === "NSE" && !/-EQ$/.test(symbol)) return false;
+    return true;
+  }).map(item => ({
+    symbol: String(item.symbol).replace(/-EQ$/, ""),
+    tradingSymbol: String(item.symbol),
+    name: String(item.name || item.symbol),
+    exchange: String(item.exch_seg).toUpperCase(),
+    token: String(item.token),
+    series: String(item.series || "EQ")
+  }));
 
-        headers: {
-          "Content-Type":
-            "application/json",
+  const unique = [...new Map(
+    equities.map(item => [item.exchange + ":" + item.tradingSymbol, item])
+  ).values()];
 
-          "Accept":
-            "application/json",
+  try {
+    await env.STOCKNEWS_KV.put(cacheKey, JSON.stringify(unique), { expirationTtl: 43200 });
+  } catch (_) {}
+  return unique;
+}
 
-          "Authorization":
-            `Bearer ${jwt}`,
+async function getAngelQuotes(env, request, requestedSymbols) {
+  const master = await getScripMaster(env);
+  const requested = new Set(requestedSymbols.map(s => s.toUpperCase()));
+  const chosen = master.filter(item =>
+    requested.has(item.symbol.toUpperCase()) ||
+    requested.has(item.tradingSymbol.toUpperCase()) ||
+    requested.has((item.symbol + "." + item.exchange).toUpperCase())
+  ).slice(0, 50);
 
-          "X-PrivateKey":
-            env.ANGEL_API_KEY,
+  if (!chosen.length) return [];
+  const jwt = await angelLogin(env);
+  const publicIP = request.headers.get("CF-Connecting-IP") || "127.0.0.1";
+  const exchangeTokens = { NSE: [], BSE: [] };
+  for (const item of chosen) exchangeTokens[item.exchange].push(item.token);
 
-          "X-SourceID":
-            "WEB",
-
-          "X-UserType":
-            "USER",
-
-          "X-ClientLocalIP":
-            "127.0.0.1",
-
-          "X-ClientPublicIP":
-            publicIP,
-
-          "X-MACAddress":
-            "00:00:00:00:00:00"
-        },
-
-        body: JSON.stringify({
-          exchange:
-            "NSE",
-
-          tradingsymbol:
-            "SBIN-EQ",
-
-          symboltoken:
-            "3045"
-        })
-      }
-    );
-
-  const result =
-    await response.json();
-
-  if (
-    !response.ok ||
-    !result.status
-  ) {
-    throw new Error(
-      result.message ||
-      "Angel One LTP data failed"
-    );
-  }
-
-  const data =
-    result.data;
-
-  if (!data) {
-    throw new Error(
-      "Angel One returned empty LTP data"
-    );
-  }
-
-  return [
+  const response = await fetch(
+    "https://apiconnect.angelone.in/rest/secure/angelbroking/market/v1/quote/",
     {
-      symbol:
-        data.tradingsymbol,
-
-      token:
-        data.symboltoken,
-
-      price:
-        data.ltp
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": "Bearer " + jwt,
+        "X-PrivateKey": env.ANGEL_API_KEY,
+        "X-SourceID": "WEB",
+        "X-UserType": "USER",
+        "X-ClientLocalIP": "127.0.0.1",
+        "X-ClientPublicIP": publicIP,
+        "X-MACAddress": "00:00:00:00:00:00"
+      },
+      body: JSON.stringify({ mode: "FULL", exchangeTokens })
     }
-  ];
+  );
+  const result = await response.json();  if (!response.ok || !result.status) {
+    throw new Error(result.message || "Angel One batch quote request failed");  }
+
+  const fetched = result.data?.fetched || [];
+  return fetched.map(item => {
+    const exchange = String(item.exchange || "").toUpperCase();
+    const tradingSymbol = String(item.tradingSymbol || "");
+    const baseSymbol = tradingSymbol.replace(/-EQ$/, "");
+    const original = chosen.find(x => x.exchange === exchange && x.token === String(item.symbolToken));
+    return {
+      symbol: baseSymbol,
+      tradingSymbol,
+      name: original?.name || baseSymbol,
+      exchange,
+      token: String(item.symbolToken || ""),
+      price: Number(item.ltp),
+      change: item.netChange == null ? null : Number(item.netChange),
+      changePercent: item.percentChange == null ? null : Number(item.percentChange),
+      open: item.open == null ? null : Number(item.open),
+      high: item.high == null ? null : Number(item.high),
+      low: item.low == null ? null : Number(item.low),
+      close: item.close == null ? null : Number(item.close),
+      volume: item.tradeVolume == null ? null : Number(item.tradeVolume)
+    };
+  });
 }
 
 /* =========================================
@@ -415,36 +418,94 @@ export default {
     }
 
     /* =====================================
-       ANGEL MARKET TEST
+       ALL NSE/BSE EQUITY SEARCH
        ===================================== */
 
-    if (
-      url.pathname === "/api/market" &&
-      request.method === "GET"
-    ) {
+    if (url.pathname === "/api/stocks" && request.method === "GET") {
       try {
-
-        const prices =
-          await getAngelPrices(
-            env,
-            request
-          );
-
-        return json({
-          success: true,
-          prices
-        });
-
+        const master = await getScripMaster(env);
+        const q = String(url.searchParams.get("q") || "").trim().toLowerCase();
+        const exchange = String(url.searchParams.get("exchange") || "").trim().toUpperCase();
+        const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get("limit") || 500)));
+        const offset = Math.max(0, Number(url.searchParams.get("offset") || 0));
+        const filtered = master.filter(item =>
+          (!exchange || item.exchange === exchange) &&
+          (!q || item.symbol.toLowerCase().includes(q) ||
+            item.tradingSymbol.toLowerCase().includes(q) ||
+            item.name.toLowerCase().includes(q))
+        );
+        return json({ success: true, total: filtered.length, offset, limit, stocks: filtered.slice(offset, offset + limit) });
       } catch (e) {
+        return json({ success: false, error: e.message || "Stock directory unavailable" }, 502);
+      }
+    }
 
-        return json({
-          success: false,
+    /* =====================================
+       BATCH LIVE MARKET QUOTES (UP TO 50)
+       ===================================== */
 
-          error:
-            e.message ||
-            "Angel One market error"
+    if (url.pathname === "/api/market" && request.method === "GET") {
+      try {
+        const symbols = String(url.searchParams.get("symbols") || "")
+          .split(",").map(s => s.trim()).filter(Boolean);
+        if (!symbols.length) {
+          return json({ success: false, error: "Pass symbols=SYMBOL1,SYMBOL2 (up to 50 per request)" }, 400);
+        }
+        if (symbols.length > 50) {
+          return json({ success: false, error: "Maximum 50 symbols per quote request" }, 400);
+        }
+        const prices = await getAngelQuotes(env, request, symbols);
+        return json({ success: true, prices, requested: symbols.length, returned: prices.length, updatedAt: new Date().toISOString() });
+      } catch (e) {
+        return json({ success: false, error: e.message || "Angel One market error" }, 502);
+      }
+    }
 
-        }, 500);
+    /* =====================================
+       HISTORICAL CANDLE DATA
+       ===================================== */
+
+    if (url.pathname === "/api/candles" && request.method === "GET") {
+      try {
+        const symbol = String(url.searchParams.get("symbol") || "").trim().toUpperCase();
+        const interval = String(url.searchParams.get("interval") || "ONE_DAY").toUpperCase();
+        const allowedIntervals = new Set(["ONE_MINUTE","THREE_MINUTE","FIVE_MINUTE","TEN_MINUTE","FIFTEEN_MINUTE","THIRTY_MINUTE","ONE_HOUR","ONE_DAY"]);
+        if (!symbol || !allowedIntervals.has(interval)) {
+          return json({ success: false, error: "Valid symbol and interval are required" }, 400);
+        }
+        const master = await getScripMaster(env);
+        const instrument = master.find(x => x.symbol.toUpperCase() === symbol || x.tradingSymbol.toUpperCase() === symbol);
+        if (!instrument) return json({ success: false, error: "Stock not found in instrument master" }, 404);
+        const to = new Date();
+        const from = new Date(to.getTime() - (interval === "ONE_DAY" ? 180 : 7) * 86400000);
+        const formatDate = d => {
+          const pad = n => String(n).padStart(2, "0");
+          return pad(d.getDate()) + "-" + pad(d.getMonth()+1) + "-" + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+        };
+        const jwt = await angelLogin(env);
+        const response = await fetch("https://apiconnect.angelone.in/rest/secure/angelbroking/historical/v1/getCandleData", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json", "Accept": "application/json",
+            "Authorization": "Bearer " + jwt, "X-PrivateKey": env.ANGEL_API_KEY,
+            "X-SourceID": "WEB", "X-UserType": "USER",
+            "X-ClientLocalIP": "127.0.0.1",
+            "X-ClientPublicIP": request.headers.get("CF-Connecting-IP") || "127.0.0.1",
+            "X-MACAddress": "00:00:00:00:00:00"
+          },
+          body: JSON.stringify({
+            exchange: instrument.exchange,
+            symboltoken: instrument.token,
+            interval,
+            fromdate: formatDate(from),
+            todate: formatDate(to)
+          })
+        });
+        const result = await response.json();
+        if (!response.ok || !result.status) throw new Error(result.message || "Historical candles unavailable");
+        return json({ success: true, symbol: instrument.symbol, exchange: instrument.exchange, interval, candles: result.data || [] });
+      } catch (e) {
+        return json({ success: false, error: e.message || "Historical data unavailable" }, 502);
       }
     }
 
@@ -474,8 +535,7 @@ export default {
 
         if (
           body.password !==
-          env.ADMIN_PASSWORD
-        ) {
+          env.ADMIN_PASSWORD        ) {
 
           return json(
             {
@@ -486,8 +546,7 @@ export default {
           );
         }
 
-        const session =
-          await makeSession(
+        const session =          await makeSession(
             env.ADMIN_PASSWORD
           );
 
@@ -537,8 +596,7 @@ export default {
           admin:
             loggedIn
         },
-        loggedIn
-          ? 200
+        loggedIn          ? 200
           : 401
       );
     }
