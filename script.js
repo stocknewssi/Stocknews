@@ -992,7 +992,7 @@ function directoryRowsMarkup(rows) {
     const changeText = change === null ? "—" : (change >= 0 ? "▲ +" : "▼ ") + change.toFixed(2) + "%";
     const changeStyle = change === null ? "neutral" : change >= 0 ? "up" : "down";
     const range = row.high != null && row.low != null ? money(row.low) + " – " + money(row.high) : "—";
-    return '<tr><td><a class="directory-company" href="#/stock/' + encodeURIComponent(row.symbol) + '"><span class="directory-symbol-logo">' + esc(String(row.symbol).slice(0,2)) + '</span><span><strong>' + esc(row.symbol) + '</strong><small>' + esc(row.name || row.tradingSymbol || "") + '</small></span></a></td><td><span class="directory-exchange">' + esc(row.exchange) + '</span></td><td class="directory-price">' + price + '</td><td><span class="directory-change ' + changeStyle + '">' + changeText + '</span></td><td class="directory-range">' + range + '</td><td><a class="directory-view" href="#/stock/' + encodeURIComponent(row.symbol) + '">View ↗</a></td></tr>';
+    return '<tr><td><a class="directory-company" href="#/stock/' + encodeURIComponent(row.symbol + "." + row.exchange) + '"><span class="directory-symbol-logo">' + esc(String(row.symbol).slice(0,2)) + '</span><span><strong>' + esc(row.symbol) + '</strong><small>' + esc(row.name || row.tradingSymbol || "") + '</small></span></a></td><td><span class="directory-exchange">' + esc(row.exchange) + '</span></td><td class="directory-price">' + price + '</td><td><span class="directory-change ' + changeStyle + '">' + changeText + '</span></td><td class="directory-range">' + range + '</td><td><a class="directory-view" href="#/stock/' + encodeURIComponent(row.symbol + "." + row.exchange) + '">View ↗</a></td></tr>';
   }).join("") + '</tbody></table></div>';
 }
 
@@ -1094,8 +1094,19 @@ function setupStocksDirectory() {
 
 function stockPage(symbol) {
   const decoded = decodeURIComponent(symbol || "");
-
-  const x = getStock(decoded);
+  const parts = decoded.match(/^(.*)\.(NSE|BSE)$/i);
+  const baseSymbol = parts ? parts[1] : decoded;
+  const exchange = parts ? parts[2].toUpperCase() : "";
+  const directoryRow = (directoryState.rows || []).find(row =>
+    String(row.symbol).toUpperCase() === baseSymbol.toUpperCase() &&
+    (!exchange || String(row.exchange).toUpperCase() === exchange)
+  );
+  const x = getStock(baseSymbol) || (directoryRow ? [
+    directoryRow.symbol, directoryRow.name || directoryRow.tradingSymbol,
+    directoryRow.price, directoryRow.changePercent, directoryRow.exchange,
+    directoryRow.change, directoryRow.open, directoryRow.high, directoryRow.low,
+    directoryRow.close, directoryRow.volume
+  ] : null);
 
   if (!x) {
     return `
