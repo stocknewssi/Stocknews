@@ -177,8 +177,7 @@ async function generateTOTP(secret) {
 
   const code =
     ((signature[offset] & 0x7f) << 24) |
-    ((signature[offset + 1] & 0xff) << 16) |    ((signature[offset + 2] & 0xff) << 8) |
-    (signature[offset + 3] & 0xff);
+    ((signature[offset + 1] & 0xff) << 16) |    ((signature[offset + 2] & 0xff) << 8) |    (signature[offset + 3] & 0xff);
 
   return String(
     code % 1000000
@@ -357,8 +356,7 @@ async function getAngelQuotes(env, request, requestedSymbols) {
       body: JSON.stringify({ mode: "LTP", exchangeTokens })
     }
   );
-  const result = await response.json();
-  if (!response.ok || !result.status) {
+  const result = await response.json();  if (!response.ok || !result.status) {
     throw new Error(result.message || "Angel One batch quote request failed");
   }
 
@@ -466,36 +464,50 @@ export default {
     }
 
     /* =====================================
-       ANGEL MARKET TEST
+       HISTORICAL CANDLE DATA
        ===================================== */
 
-    if (
-      url.pathname === "/api/market" &&
-      request.method === "GET"
-    ) {
+    if (url.pathname === "/api/candles" && request.method === "GET") {
       try {
-
-        const prices =
-          await getAngelPrices(
-            env,
-            request
-          );
-
-        return json({
-          success: true,
-          prices
+        const symbol = String(url.searchParams.get("symbol") || "").trim().toUpperCase();
+        const interval = String(url.searchParams.get("interval") || "ONE_DAY").toUpperCase();
+        const allowedIntervals = new Set(["ONE_MINUTE","THREE_MINUTE","FIVE_MINUTE","TEN_MINUTE","FIFTEEN_MINUTE","THIRTY_MINUTE","ONE_HOUR","ONE_DAY"]);
+        if (!symbol || !allowedIntervals.has(interval)) {
+          return json({ success: false, error: "Valid symbol and interval are required" }, 400);
+        }
+        const master = await getScripMaster(env);
+        const instrument = master.find(x => x.symbol.toUpperCase() === symbol || x.tradingSymbol.toUpperCase() === symbol);
+        if (!instrument) return json({ success: false, error: "Stock not found in instrument master" }, 404);
+        const to = new Date();
+        const from = new Date(to.getTime() - (interval === "ONE_DAY" ? 180 : 7) * 86400000);
+        const formatDate = d => {
+          const pad = n => String(n).padStart(2, "0");
+          return pad(d.getDate()) + "-" + pad(d.getMonth()+1) + "-" + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+        };
+        const jwt = await angelLogin(env);
+        const response = await fetch("https://apiconnect.angelone.in/rest/secure/angelbroking/historical/v1/getCandleData", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json", "Accept": "application/json",
+            "Authorization": "Bearer " + jwt, "X-PrivateKey": env.ANGEL_API_KEY,
+            "X-SourceID": "WEB", "X-UserType": "USER",
+            "X-ClientLocalIP": "127.0.0.1",
+            "X-ClientPublicIP": request.headers.get("CF-Connecting-IP") || "127.0.0.1",
+            "X-MACAddress": "00:00:00:00:00:00"
+          },
+          body: JSON.stringify({
+            exchange: instrument.exchange,
+            symboltoken: instrument.token,
+            interval,
+            fromdate: formatDate(from),
+            todate: formatDate(to)
+          })
         });
-
+        const result = await response.json();
+        if (!response.ok || !result.status) throw new Error(result.message || "Historical candles unavailable");
+        return json({ success: true, symbol: instrument.symbol, exchange: instrument.exchange, interval, candles: result.data || [] });
       } catch (e) {
-
-        return json({
-          success: false,
-
-          error:
-            e.message ||
-            "Angel One market error"
-
-        }, 500);
+        return json({ success: false, error: e.message || "Historical data unavailable" }, 502);
       }
     }
 
@@ -537,8 +549,7 @@ export default {
           );
         }
 
-        const session =
-          await makeSession(
+        const session =          await makeSession(
             env.ADMIN_PASSWORD
           );
 
