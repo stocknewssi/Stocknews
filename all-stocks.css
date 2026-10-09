@@ -1,0 +1,42 @@
+/* StockNews full market directory — clean responsive light dashboard */
+.market-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding:30px 32px;margin:4px 0 22px;border:1px solid #dfe7f2;border-radius:22px;background:linear-gradient(120deg,#fff 0%,#f0f6ff 70%,#e8f2ff 100%);box-shadow:0 10px 30px rgba(27,54,93,.06)}
+.market-hero h1{font-size:clamp(30px,4vw,42px);letter-spacing:-1.4px;margin:8px 0 10px;color:#15233b}
+.market-hero p{max-width:640px;margin:0;color:#68758a;font-size:15px}
+.market-live-chip{display:flex;align-items:center;gap:9px;white-space:nowrap;background:#fff;border:1px solid #dce7f3;border-radius:999px;padding:10px 14px;color:#506078;font-size:12px;font-weight:700}
+.market-live-chip i{width:8px;height:8px;border-radius:50%;background:#0aa875;box-shadow:0 0 0 4px #e2f8ef}
+.directory-toolbar{display:grid;grid-template-columns:minmax(200px,1fr) 160px auto;gap:12px;margin:18px 0}
+.directory-search{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #dce4ef;border-radius:13px;padding:0 14px;min-height:50px;color:#7d8ba0}
+.directory-search span{font-size:25px;line-height:1}
+.directory-search input{width:100%;min-width:0;border:0!important;outline:none!important;box-shadow:none!important;background:transparent!important;color:#172033!important;font-size:14px}
+#directoryExchange{min-height:50px;border:1px solid #dce4ef;border-radius:13px;background:#fff;color:#26364e;padding:0 13px;font-weight:700}
+.directory-refresh{min-height:50px;padding:0 18px;border:1px solid #cbdcf7;border-radius:13px;background:#edf4ff;color:#2059c5;font-weight:800}
+.directory-refresh:hover{background:#e1edff}.directory-refresh:disabled{opacity:.6}
+.directory-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:20px 0}
+.directory-stats>div{display:flex;flex-direction:column;gap:7px;padding:18px 20px;background:#fff;border:1px solid #e0e7f0;border-radius:15px;box-shadow:0 5px 18px rgba(25,45,75,.035)}
+.directory-stats span{font-size:12px;color:#718096;font-weight:700}.directory-stats strong{font-size:25px;letter-spacing:-.5px;color:#1c2b43}
+.directory-table-card{background:#fff;border:1px solid #e0e7f0;border-radius:20px;overflow:hidden;box-shadow:0 8px 28px rgba(23,32,51,.045)}
+.directory-table-head{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:23px 24px;border-bottom:1px solid #e9eef5}
+.directory-table-head h2{font-size:20px;margin:0 0 5px;color:#1c2b43}.directory-table-head p{font-size:12px;color:#77849a;margin:0}
+.exchange-badge{padding:7px 10px;border-radius:8px;background:#edf4ff;color:#225ac0;font-size:11px;font-weight:900;white-space:nowrap}
+.directory-table-scroll{overflow-x:auto}
+.directory-table{width:100%;border-collapse:collapse;min-width:760px;background:#fff}
+.directory-table thead th{padding:13px 18px;background:#f8fafd;color:#7a879a;text-align:left;font-size:10px;letter-spacing:.6px;text-transform:uppercase;border-bottom:1px solid #e8edf4;white-space:nowrap}
+.directory-table tbody td{padding:15px 18px;border-bottom:1px solid #edf1f6;vertical-align:middle}
+.directory-table tbody tr:hover{background:#f9fbff}.directory-table tbody tr:last-child td{border-bottom:0}
+.directory-company{display:flex;align-items:center;gap:11px;min-width:220px;color:#1c2b43}
+.directory-company>span:last-child{display:flex;flex-direction:column;gap:4px}
+.directory-company strong{font-size:13px;font-weight:850}.directory-company small{font-size:11px;color:#7a8799;max-width:260px;white-space:normal}
+.directory-symbol-logo{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border:1px solid #dce8f8;border-radius:11px;background:#f0f6ff;color:#2764c9;font-size:11px;font-weight:900}
+.directory-exchange{display:inline-block;padding:5px 7px;border-radius:6px;background:#f0f4f8;color:#53647b;font-size:10px;font-weight:900}
+.directory-price{font-variant-numeric:tabular-nums;font-size:14px;font-weight:850;color:#1c2b43;white-space:nowrap}
+.directory-change{display:inline-block;padding:6px 8px;border-radius:7px;font-size:11px;font-weight:850;white-space:nowrap}
+.directory-change.up{background:#e9f9f1;color:#087f56!important}.directory-change.down{background:#fff0f1;color:#c53649!important}.directory-change.neutral{background:#f2f4f7;color:#718096}
+.directory-range{font-size:11px;color:#69788d;white-space:nowrap}.directory-view{font-size:11px;font-weight:800;color:#2764c9;white-space:nowrap}
+.directory-pagination{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:17px 22px;border-top:1px solid #e8edf4;color:#718096;font-size:12px}
+.directory-pagination>div{display:flex;gap:8px}.directory-pagination button,.directory-message button{padding:9px 12px;border:1px solid #dce4ef;border-radius:9px;background:#fff;color:#354761;font-size:12px;font-weight:800}
+.directory-pagination button:disabled{opacity:.4;cursor:not-allowed}.directory-disclaimer{padding:0 22px 20px;margin:0;color:#8290a3;font-size:11px;line-height:1.5}
+.directory-message{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;min-height:240px;padding:30px;text-align:center;color:#2b3a51}
+.directory-message strong{font-size:15px}.directory-message small{max-width:480px;color:#7a8799;font-size:12px}
+.directory-error{color:#b93848}.directory-spinner{width:24px;height:24px;border:3px solid #dbe7f8;border-top-color:#2764c9;border-radius:50%;animation:directory-spin .8s linear infinite}
+@keyframes directory-spin{to{transform:rotate(360deg)}}
+@media(max-width:700px){.market-hero{align-items:flex-start;flex-direction:column;padding:23px 20px;gap:17px}.market-live-chip{white-space:normal}.directory-toolbar{grid-template-columns:1fr 1fr}.directory-search{grid-column:1/-1}.directory-refresh{grid-column:1/-1}.directory-stats{gap:8px}.directory-stats>div{padding:14px 12px}.directory-stats strong{font-size:20px}.directory-stats span{font-size:10px}.directory-table-head{padding:18px}.directory-pagination{align-items:flex-start;flex-direction:column;padding:15px}.directory-pagination>div{width:100%}.directory-pagination button{flex:1}.directory-disclaimer{padding:0 16px 18px}}
