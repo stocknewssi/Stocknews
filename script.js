@@ -19,6 +19,66 @@ const stocks = [
   ["SBIN", "State Bank of India", 1012.1, 1.55, "Banking"]
 ];
 
+
+/* Sector and market-cap metadata for the currently seeded watchlist.
+   Expand this map from a verified exchange master before claiming full coverage. */
+const stockMeta = {
+  RELIANCE: { sector: "Energy", cap: "Large Cap", exchange: "NSE" },
+  TCS: { sector: "IT", cap: "Large Cap", exchange: "NSE" },
+  HDFCBANK: { sector: "Banking", cap: "Large Cap", exchange: "NSE" },
+  INFY: { sector: "IT", cap: "Large Cap", exchange: "NSE" },
+  ICICIBANK: { sector: "Banking", cap: "Large Cap", exchange: "NSE" },
+  ITC: { sector: "FMCG", cap: "Large Cap", exchange: "NSE" },
+  SBIN: { sector: "Banking", cap: "Large Cap", exchange: "NSE" }
+};
+
+function sectorOf(stock) {
+  return stockMeta[stock[0]]?.sector || (stock[4] === "Large Cap" ? "Other" : stock[4] || "Other");
+}
+
+function capOf(stock) {
+  return stockMeta[stock[0]]?.cap || (["Large Cap", "Mid Cap", "Small Cap"].includes(stock[4]) ? stock[4] : "Unclassified");
+}
+
+function sectorOverview() {
+  const groups = {};
+  stocks.forEach(stock => {
+    const sector = sectorOf(stock);
+    if (!groups[sector]) groups[sector] = [];
+    groups[sector].push(stock);
+  });
+  const items = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  return `
+    <section class="section-block">
+      <div class="section-heading">
+        <div><span class="eyebrow">SECTOR VIEW</span><h2>Sector-wise Market</h2></div>
+        <a href="#/screener" class="section-link">Filter stocks →</a>
+      </div>
+      <div class="sector-grid">
+        ${items.map(([sector, list]) => {
+          const avg = list.reduce((sum, stock) => sum + (Number(stock[3]) || 0), 0) / list.length;
+          return `<a class="sector-card" href="#/sector/${encodeURIComponent(sector)}">
+            <span class="sector-card-icon">▦</span>
+            <span class="sector-card-name">${esc(sector)}</span>
+            <strong>${list.length} <small>stocks</small></strong>
+            <span class="${changeClass(avg)}">${percent(avg)} avg. move</span>
+          </a>`;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function sectorPage(name) {
+  const sector = decodeURIComponent(name || "");
+  const list = stocks.filter(stock => sectorOf(stock).toLowerCase() === sector.toLowerCase());
+  if (!list.length) return `<div class="empty-card"><h1>Sector not found</h1><p>This sector has no stocks in the currently loaded watchlist.</p><a class="primary-btn" href="#/stocks">All stocks</a></div>`;
+  const avg = list.reduce((sum, stock) => sum + (Number(stock[3]) || 0), 0) / list.length;
+  return `<div class="page-header"><div><span class="eyebrow">SECTOR OVERVIEW</span><h1>${esc(sector)}</h1><p class="muted">${list.length} stocks in the current watchlist · Average move <strong class="${changeClass(avg)}">${percent(avg)}</strong></p></div><a href="#/screener" class="secondary-btn">Open screener</a></div>
+    <div class="summary-grid"><div class="summary-card blue-card"><div><small>Stocks shown</small><strong>${list.length}</strong></div></div><div class="summary-card green-card"><div><small>Gainers</small><strong>${list.filter(x => Number(x[3]) > 0).length}</strong></div></div><div class="summary-card red-card"><div><small>Losers</small><strong>${list.filter(x => Number(x[3]) < 0).length}</strong></div></div></div>
+    <section class="section-block"><div class="section-heading"><div><span class="eyebrow">SECTOR STOCKS</span><h2>${esc(sector)} companies</h2></div></div>${tbl(list)}</section>${marketStatus()}`;
+}
+
 let news = [];
 let adminLoggedIn = false;
 let liveLoading = false;
@@ -575,6 +635,8 @@ function home() {
 
       ${marketSummary()}
 
+      ${sectorOverview()}
+
       <section class="market-index-grid">
 
         <div class="index-card">
@@ -823,7 +885,7 @@ function screener() {
         <span class="eyebrow">ANALYSIS TOOL</span>
         <h1>Stock Screener</h1>
         <p class="muted">
-          Search and filter stocks using live market data.
+          Search by symbol or company, then filter by performance, sector and market-cap category.
         </p>
       </div>
 
@@ -842,6 +904,16 @@ function screener() {
           autocomplete="off"
         >
 
+      </div>
+
+      <div class="screener-selects">
+        <select id="sectorFilter" aria-label="Filter by sector">
+          <option value="">All sectors</option>
+          <option value="Energy">Energy</option><option value="IT">IT</option><option value="Banking">Banking</option><option value="FMCG">FMCG</option><option value="Other">Other</option>
+        </select>
+        <select id="capFilter" aria-label="Filter by market capitalization">
+          <option value="">All market caps</option><option value="Large Cap">Large Cap</option><option value="Mid Cap">Mid Cap</option><option value="Small Cap">Small Cap</option><option value="Unclassified">Unclassified</option>
+        </select>
       </div>
 
       <div class="filter-buttons">
@@ -876,6 +948,7 @@ function screener() {
 
     <div class="section-block">
 
+      <p id="screenerCount" class="muted" aria-live="polite"></p>
       <div id="t">
         ${tbl()}
       </div>
@@ -1314,6 +1387,9 @@ function setupScreener() {
   const allBtn = document.getElementById("allFilter");
   const gainersBtn = document.getElementById("gainersFilter");
   const losersBtn = document.getElementById("losersFilter");
+  const sectorFilter = document.getElementById("sectorFilter");
+  const capFilter = document.getElementById("capFilter");
+  const count = document.getElementById("screenerCount");
 
   if (!search || !table) return;
 
@@ -1340,10 +1416,12 @@ function setupScreener() {
 
     let result = stocks.filter(stock => {
       const text =
-        `${stock[0]} ${stock[1]} ${stock[4]}`
+        `${stock[0]} ${stock[1]} ${sectorOf(stock)} ${capOf(stock)}`
           .toLowerCase();
-
-      return text.includes(query);
+      const matchesQuery = text.includes(query);
+      const matchesSector = !sectorFilter?.value || sectorOf(stock) === sectorFilter.value;
+      const matchesCap = !capFilter?.value || capOf(stock) === capFilter.value;
+      return matchesQuery && matchesSector && matchesCap;
     });
 
     if (mode === "gainers") {
@@ -1359,9 +1437,12 @@ function setupScreener() {
     }
 
     table.innerHTML = tbl(result);
+    if (count) count.textContent = `Showing ${result.length} of ${stocks.length} stocks in the current watchlist`;
   }
 
   search.addEventListener("input", render);
+  sectorFilter?.addEventListener("change", render);
+  capFilter?.addEventListener("change", render);
 
   if (allBtn) {
     allBtn.addEventListener("click", () => {
@@ -1613,6 +1694,10 @@ function renderCurrentPage() {
 
         ${marketStatus()}
       `;
+      break;
+
+    case "sector":
+      html = sectorPage(parts[1]);
       break;
 
     case "stock":

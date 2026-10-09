@@ -427,3 +427,20 @@ p{
   right:4%;
   bottom:15%;
  
+
+
+}
+
+/* Sector cards and enhanced screener controls */
+.sector-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.sector-card{display:flex;flex-direction:column;gap:10px;min-height:145px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--card);transition:transform .18s ease,border-color .18s ease}
+.sector-card:hover{transform:translateY(-3px);border-color:var(--blue)}
+.sector-card-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:rgba(40,120,255,.14);color:var(--blue);font-size:20px}
+.sector-card-name{font-weight:800;font-size:15px}
+.sector-card strong{font-size:24px}
+.sector-card strong small{font-size:12px;color:var(--muted);font-weight:600}
+.screener-selects{display:flex;gap:10px;flex-wrap:wrap}
+.screener-selects select{min-height:42px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--text);min-width:155px}
+#screenerCount{margin:16px 0 8px}
+@media(max-width:900px){.sector-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.sector-grid{grid-template-columns:1fr 1fr;gap:9px}.sector-card{padding:12px;min-height:130px}.screener-selects{width:100%}.screener-selects select{flex:1;min-width:130px}}
