@@ -224,7 +224,8 @@ async function loadLiveMarket() {
   liveError = false;
 
   try {
-    const response = await fetch("/api/market", {
+    const symbols = stocks.map(stock => String(stock[0]) + ".NSE").slice(0, 50);
+    const response = await fetch("/api/market?symbols=" + encodeURIComponent(symbols.join(",")), {
       method: "GET",
       credentials: "include",
       cache: "no-store"
@@ -963,6 +964,134 @@ function screener() {
    STOCK DETAIL
    ========================================================= */
 
+
+/* FULL NSE/BSE STOCK DIRECTORY WITH PAGINATED LIVE QUOTES */
+let directoryState = { query: "", exchange: "NSE", offset: 0, limit: 50, total: 0, rows: [], loading: false, error: "", updatedAt: null, requestId: 0 };
+let directoryRefreshTimer = null;
+
+function stocksDirectoryPage() {
+  return '<section class="market-hero"><div><span class="eyebrow">NSE + BSE MARKET</span><h1>All Indian Stocks</h1><p>Search the full exchange directory and view live quotes for the stocks on this page.</p></div><div class="market-live-chip"><i></i><span id="directoryLiveLabel">Connecting to live market…</span></div></section>' +
+    '<section class="directory-toolbar"><label class="directory-search"><span>⌕</span><input id="directorySearch" type="search" placeholder="Search company or symbol…" value="' + esc(directoryState.query) + '" autocomplete="off"></label>' +
+    '<select id="directoryExchange" aria-label="Exchange"><option value="NSE" ' + (directoryState.exchange === "NSE" ? "selected" : "") + '>NSE</option><option value="BSE" ' + (directoryState.exchange === "BSE" ? "selected" : "") + '>BSE</option><option value="" ' + (directoryState.exchange === "" ? "selected" : "") + '>NSE + BSE</option></select>' +
+    '<button class="directory-refresh" id="directoryRefresh" type="button">↻ Refresh prices</button></section>' +
+    '<section class="directory-stats"><div><span>Stocks found</span><strong id="directoryTotal">—</strong></div><div><span>Showing</span><strong id="directoryRange">—</strong></div><div><span>Price updates</span><strong id="directoryQuoteCount">—</strong></div></section>' +
+    '<section class="directory-table-card"><div class="directory-table-head"><div><h2>Stock directory</h2><p>Prices update automatically while the market data service is available.</p></div><span class="exchange-badge" id="directoryExchangeBadge">' + esc(directoryState.exchange || "NSE + BSE") + '</span></div>' +
+    '<div id="directoryTable">' + directoryLoadingMarkup() + '</div><div class="directory-pagination"><span id="directoryPageLabel">Loading stock directory…</span><div><button type="button" id="directoryPrev" disabled>← Previous</button><button type="button" id="directoryNext" disabled>Next →</button></div></div>' +
+    '<p class="directory-disclaimer">Live prices are supplied by Angel One when available. Outside market hours, prices may reflect the last available quote. Missing quotes are shown as —, not estimated values.</p></section>';
+}
+
+function directoryLoadingMarkup() {
+  return '<div class="directory-message"><span class="directory-spinner"></span><strong>Loading exchange stocks…</strong><small>Fetching the latest NSE/BSE instrument list.</small></div>';
+}
+
+function directoryRowsMarkup(rows) {
+  if (!rows.length) return '<div class="directory-message"><strong>No stocks found</strong><small>Try a different company name or symbol.</small></div>';
+  return '<div class="directory-table-scroll"><table class="directory-table"><thead><tr><th>Company / Symbol</th><th>Exchange</th><th>Last price</th><th>Change</th><th>Day range</th><th></th></tr></thead><tbody>' + rows.map(row => {
+    const price = row.price != null && Number.isFinite(Number(row.price)) ? money(row.price) : "—";
+    const change = row.changePercent != null && Number.isFinite(Number(row.changePercent)) ? Number(row.changePercent) : null;
+    const changeText = change === null ? "—" : (change >= 0 ? "▲ +" : "▼ ") + change.toFixed(2) + "%";
+    const changeStyle = change === null ? "neutral" : change >= 0 ? "up" : "down";
+    const range = row.high != null && row.low != null ? money(row.low) + " – " + money(row.high) : "—";
+    return '<tr><td><a class="directory-company" href="#/stock/' + encodeURIComponent(row.symbol) + '"><span class="directory-symbol-logo">' + esc(String(row.symbol).slice(0,2)) + '</span><span><strong>' + esc(row.symbol) + '</strong><small>' + esc(row.name || row.tradingSymbol || "") + '</small></span></a></td><td><span class="directory-exchange">' + esc(row.exchange) + '</span></td><td class="directory-price">' + price + '</td><td><span class="directory-change ' + changeStyle + '">' + changeText + '</span></td><td class="directory-range">' + range + '</td><td><a class="directory-view" href="#/stock/' + encodeURIComponent(row.symbol) + '">View ↗</a></td></tr>';
+  }).join("") + '</tbody></table></div>';
+}
+
+async function loadStockDirectory() {
+  const requestId = ++directoryState.requestId;
+  directoryState.loading = true;
+  directoryState.error = "";
+  const table = document.getElementById("directoryTable");
+  if (table && !directoryState.rows.length) table.innerHTML = directoryLoadingMarkup();
+  const params = new URLSearchParams({ q: directoryState.query, exchange: directoryState.exchange, limit: String(directoryState.limit), offset: String(directoryState.offset) });
+  try {
+    const response = await fetch("/api/stocks?" + params.toString(), { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok || !data.success || !Array.isArray(data.stocks)) throw new Error(data.error || "Stock directory request failed");
+    if (requestId !== directoryState.requestId) return;
+    directoryState.rows = data.stocks;
+    directoryState.total = Number(data.total) || 0;
+    directoryState.loading = false;
+    await refreshDirectoryQuotes(requestId);
+    renderDirectoryTable();
+  } catch (error) {
+    if (requestId !== directoryState.requestId) return;
+    directoryState.loading = false;
+    directoryState.error = error.message || "Stock directory unavailable";
+    const target = document.getElementById("directoryTable");
+    if (target) target.innerHTML = '<div class="directory-message directory-error"><strong>Stock list could not load</strong><small>' + esc(directoryState.error) + '</small><button id="directoryRetry" type="button">Try again</button></div>';
+    document.getElementById("directoryRetry")?.addEventListener("click", loadStockDirectory);
+    const label = document.getElementById("directoryLiveLabel");
+    if (label) label.textContent = "Market data connection unavailable";
+  }
+}
+
+async function refreshDirectoryQuotes(requestId = directoryState.requestId) {
+  const rows = directoryState.rows;
+  if (!rows.length) return;
+  const symbols = rows.map(row => String(row.symbol) + "." + String(row.exchange));
+  try {
+    const response = await fetch("/api/market?symbols=" + encodeURIComponent(symbols.join(",")), { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok || !data.success || !Array.isArray(data.prices)) throw new Error(data.error || "Live quote request failed");
+    if (requestId !== directoryState.requestId) return;
+    const byKey = new Map(data.prices.map(p => [String(p.symbol).toUpperCase() + "." + String(p.exchange).toUpperCase(), p]));
+    directoryState.rows = rows.map(row => {
+      const quote = byKey.get(String(row.symbol).toUpperCase() + "." + String(row.exchange).toUpperCase());
+      return quote ? Object.assign({}, row, quote) : row;
+    });
+    directoryState.updatedAt = data.updatedAt || new Date().toISOString();
+    const label = document.getElementById("directoryLiveLabel");
+    if (label) label.textContent = "Quotes updated " + new Date(directoryState.updatedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  } catch (error) {
+    console.error("Directory quote refresh failed:", error);
+    const label = document.getElementById("directoryLiveLabel");
+    if (label) label.textContent = "Live prices temporarily unavailable";
+  }
+}
+
+function renderDirectoryTable() {
+  const target = document.getElementById("directoryTable");
+  if (target) target.innerHTML = directoryRowsMarkup(directoryState.rows);
+  const total = document.getElementById("directoryTotal");
+  const range = document.getElementById("directoryRange");
+  const quotes = document.getElementById("directoryQuoteCount");
+  const pageLabel = document.getElementById("directoryPageLabel");
+  if (total) total.textContent = number(directoryState.total);
+  const first = directoryState.total ? directoryState.offset + 1 : 0;
+  const last = Math.min(directoryState.offset + directoryState.rows.length, directoryState.total);
+  if (range) range.textContent = directoryState.total ? first + "–" + last : "0";
+  if (quotes) quotes.textContent = directoryState.rows.filter(row => row.price != null && Number.isFinite(Number(row.price))).length + " / " + directoryState.rows.length;
+  if (pageLabel) pageLabel.textContent = directoryState.total ? "Showing " + first + "–" + last + " of " + number(directoryState.total) + " stocks" : "No stocks to display";
+  const prev = document.getElementById("directoryPrev");
+  const next = document.getElementById("directoryNext");
+  if (prev) prev.disabled = directoryState.offset <= 0;
+  if (next) next.disabled = directoryState.offset + directoryState.limit >= directoryState.total;
+  const badge = document.getElementById("directoryExchangeBadge");
+  if (badge) badge.textContent = directoryState.exchange || "NSE + BSE";
+}
+
+function setupStocksDirectory() {
+  const search = document.getElementById("directorySearch");
+  const exchange = document.getElementById("directoryExchange");
+  const prev = document.getElementById("directoryPrev");
+  const next = document.getElementById("directoryNext");
+  const refresh = document.getElementById("directoryRefresh");
+  let debounce;
+  search?.addEventListener("input", () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => { directoryState.query = search.value.trim(); directoryState.offset = 0; loadStockDirectory(); }, 250);
+  });
+  exchange?.addEventListener("change", () => { directoryState.exchange = exchange.value; directoryState.offset = 0; loadStockDirectory(); });
+  prev?.addEventListener("click", () => { directoryState.offset = Math.max(0, directoryState.offset - directoryState.limit); loadStockDirectory(); });
+  next?.addEventListener("click", () => { if (directoryState.offset + directoryState.limit < directoryState.total) { directoryState.offset += directoryState.limit; loadStockDirectory(); } });
+  refresh?.addEventListener("click", async () => { refresh.disabled = true; refresh.textContent = "Refreshing…"; await refreshDirectoryQuotes(); renderDirectoryTable(); refresh.disabled = false; refresh.textContent = "↻ Refresh prices"; });
+  loadStockDirectory();
+  if (directoryRefreshTimer) clearInterval(directoryRefreshTimer);
+  directoryRefreshTimer = setInterval(() => {
+    if ((location.hash || "").startsWith("#/stocks")) refreshDirectoryQuotes().then(renderDirectoryTable);
+  }, 30000);
+}
+
 function stockPage(symbol) {
   const decoded = decodeURIComponent(symbol || "");
 
@@ -1677,23 +1806,7 @@ function renderCurrentPage() {
       break;
 
     case "stocks":
-      html = `
-        <div class="page-header">
-          <div>
-            <span class="eyebrow">MARKET UNIVERSE</span>
-            <h1>All Stocks</h1>
-            <p class="muted">
-              Browse available stocks and live market movement.
-            </p>
-          </div>
-        </div>
-
-        <div class="section-block">
-          ${tbl()}
-        </div>
-
-        ${marketStatus()}
-      `;
+      html = stocksDirectoryPage();
       break;
 
     case "sector":
@@ -1727,6 +1840,10 @@ function renderCurrentPage() {
 
   if (page === "screener") {
     setupScreener();
+  }
+
+  if (page === "stocks") {
+    setupStocksDirectory();
   }
 
   if (page === "admin") {
