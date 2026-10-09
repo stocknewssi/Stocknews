@@ -1221,59 +1221,20 @@ function stockPage(symbol) {
 
       </section>
 
-      <section class="chart-placeholder">
-
+      <section class="chart-placeholder stock-chart-section">
         <div class="chart-header">
-
-          <div>
-            <span class="eyebrow">PRICE ACTION</span>
-            <h2>Market Chart</h2>
-          </div>
-
-          <span class="chart-live">
-            ● LIVE
-          </span>
-
+          <div><span class="eyebrow">PRICE ACTION</span><h2>Market Chart</h2></div>
+          <span class="chart-live" id="stockChartStatus">Loading market history…</span>
         </div>
-
-        <div class="fake-chart">
-
-          <div class="fake-grid"></div>
-
-          <svg
-            viewBox="0 0 900 250"
-            preserveAspectRatio="none"
-            aria-hidden="true"
-          >
-            <polyline
-              points="
-                0,200
-                80,180
-                150,190
-                220,135
-                300,160
-                370,110
-                440,125
-                520,70
-                600,100
-                680,55
-                760,80
-                840,35
-                900,50
-              "
-              fill="none"
-              stroke="currentColor"
-              stroke-width="4"
-            />
-          </svg>
-
-          <div class="chart-note">
-            Live chart integration can be connected to the expanded
-            Angel One market-data backend.
-          </div>
-
+        <div class="chart-toolbar" role="group" aria-label="Chart timeframe">
+          <button type="button" data-chart-interval="ONE_MINUTE">1m</button>
+          <button type="button" data-chart-interval="FIVE_MINUTE">5m</button>
+          <button type="button" data-chart-interval="FIFTEEN_MINUTE">15m</button>
+          <button type="button" data-chart-interval="ONE_HOUR">1H</button>
+          <button type="button" data-chart-interval="ONE_DAY" class="active">1D</button>
         </div>
-
+        <div id="stockCandleChart" class="stock-candle-chart" aria-label="Historical candlestick price chart"></div>
+        <p class="chart-note">Historical OHLC candles from Angel One. Prices and availability depend on the market-data feed.</p>
       </section>
 
       <section class="section-block">
@@ -1790,6 +1751,85 @@ function setupAdmin() {
    PAGE RENDERER
    ========================================================= */
 
+async function setupStockCandles(symbol, exchange) {
+  const host = document.getElementById("stockCandleChart");
+  const status = document.getElementById("stockChartStatus");
+  if (!host || !status) return;
+  if (!window.LightweightCharts) {
+    status.textContent = "Chart library unavailable";
+    return;
+  }
+  if (host._stockChart) {
+    try { host._stockChart.remove(); } catch (_) {}
+  }
+  const chart = window.LightweightCharts.createChart(host, {
+    width: host.clientWidth || 600,
+    height: 330,
+    layout: { background: { color: "#ffffff" }, textColor: "#475569" },
+    grid: { vertLines: { color: "#eef2f7" }, horzLines: { color: "#eef2f7" } },
+    rightPriceScale: { borderColor: "#e2e8f0" },
+    timeScale: { borderColor: "#e2e8f0", timeVisible: true, secondsVisible: false },
+    crosshair: { mode: 0 }
+  });
+  host._stockChart = chart;
+  const candles = chart.addCandlestickSeries({
+    upColor: "#16a34a", downColor: "#dc2626",
+    borderUpColor: "#16a34a", borderDownColor: "#dc2626",
+    wickUpColor: "#16a34a", wickDownColor: "#dc2626"
+  });
+  let activeInterval = "ONE_DAY";
+  let requestSequence = 0;
+  function parseCandleTime(value, interval) {
+    const raw = String(value || "");
+    let date = new Date(raw);
+    if (Number.isNaN(date.getTime())) {
+      const match = raw.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+      if (match) date = new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]), Number(match[4] || 0), Number(match[5] || 0));
+    }
+    if (Number.isNaN(date.getTime())) return null;
+    if (interval === "ONE_DAY") return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() };
+    return Math.floor(date.getTime() / 1000);
+  }
+  async function loadInterval(interval) {
+    activeInterval = interval;
+    const seq = ++requestSequence;
+    host.querySelectorAll("[data-chart-interval]").forEach(button => button.classList.toggle("active", button.dataset.chartInterval === interval));
+    status.textContent = "Loading " + interval.replaceAll("_", " ").toLowerCase() + " candles…";
+    try {
+      const params = new URLSearchParams({ symbol, exchange, interval });
+      const response = await fetch("/api/candles?" + params.toString(), { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.success || !Array.isArray(data.candles)) throw new Error(data.error || "Historical data unavailable");
+      if (seq !== requestSequence || host._stockChart !== chart) return;
+      const points = data.candles.map(row => {
+        const time = parseCandleTime(row[0], interval);
+        const open = Number(row[1]), high = Number(row[2]), low = Number(row[3]), close = Number(row[4]);
+        if (!time || ![open, high, low, close].every(Number.isFinite)) return null;
+        return { time, open, high, low, close };
+      }).filter(Boolean).sort((a, b) => typeof a.time === "number" && typeof b.time === "number" ? a.time - b.time : String(a.time).localeCompare(String(b.time)));
+      if (!points.length) throw new Error("No candles returned for this timeframe");
+      candles.setData(points);
+      chart.timeScale().fitContent();
+      status.textContent = points.length + " candles · historical data";
+    } catch (error) {
+      if (seq !== requestSequence) return;
+      candles.setData([]);
+      status.textContent = error.message || "Chart data unavailable";
+    }
+  }
+  host.querySelectorAll("[data-chart-interval]").forEach(button => {
+    button.addEventListener("click", () => loadInterval(button.dataset.chartInterval));
+  });
+  if (window.ResizeObserver) {
+    const observer = new ResizeObserver(() => {
+      if (host._stockChart === chart) chart.applyOptions({ width: host.clientWidth || 600 });
+    });
+    observer.observe(host);
+    host._stockChartObserver = observer;
+  }
+  await loadInterval(activeInterval);
+}
+
 function renderCurrentPage() {
 
   const hash =
@@ -1855,6 +1895,12 @@ function renderCurrentPage() {
 
   if (page === "stocks") {
     setupStocksDirectory();
+  }
+
+  if (page === "stock") {
+    const routeSymbol = parts[1] || "";
+    const match = decodeURIComponent(routeSymbol).match(/^(.*)\.(NSE|BSE)$/i);
+    setupStockCandles(match ? match[1] : decodeURIComponent(routeSymbol), match ? match[2].toUpperCase() : "NSE");
   }
 
   if (page === "admin") {
