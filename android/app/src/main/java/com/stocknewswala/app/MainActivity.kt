@@ -115,7 +115,7 @@ private fun StockNewsWalaScreen() {
         finally { quoteLoading = false }
     }
 
-    LaunchedEffect(query, exchange, tab) { if (tab == "Stocks" || tab == "Screener" || query.isNotBlank()) loadStocks(query, exchange) }
+    LaunchedEffect(query, exchange) { loadStocks(query, exchange) }
 
     @Composable fun heading(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color = Blue, action: String = "सभी देखें") {
         Row(Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
