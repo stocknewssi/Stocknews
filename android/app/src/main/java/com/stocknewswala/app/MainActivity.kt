@@ -74,9 +74,9 @@ private fun StockNewsWalaScreen() {
                 try {
                     val code = c.responseCode
                     val body = (if (code in 200..299) c.inputStream else c.errorStream).bufferedReader().use { it.readText() }
-                    if (code !in 200..299) error("Server response " + code)
+                    if (code !in 200..299) throw IllegalStateException("Server response " + code)
                     val root = JSONObject(body)
-                    if (!root.optBoolean("success")) error(root.optString("error", "Stock list unavailable"))
+                    if (!root.optBoolean("success")) throw IllegalStateException(root.optString("error", "Stock list unavailable"))
                     val arr = root.optJSONArray("stocks")
                     buildList {
                         if (arr != null) for (i in 0 until arr.length()) {
@@ -100,11 +100,11 @@ private fun StockNewsWalaScreen() {
                 try {
                     val code = c.responseCode
                     val body = (if (code in 200..299) c.inputStream else c.errorStream).bufferedReader().use { it.readText() }
-                    if (code !in 200..299) error("Quote unavailable")
+                    if (code !in 200..299) throw IllegalStateException("Quote unavailable")
                     val root = JSONObject(body)
-                    if (!root.optBoolean("success")) error("Quote unavailable")
-                    val arr = root.optJSONArray("prices") ?: error("No quote")
-                    if (arr.length() == 0) error("No quote")
+                    if (!root.optBoolean("success")) throw IllegalStateException("Quote unavailable")
+                    val arr = root.optJSONArray("prices") ?: throw IllegalStateException("No quote")
+                    if (arr.length() == 0) throw IllegalStateException("No quote")
                     val o = arr.getJSONObject(0)
                     val p = o.optDouble("price", Double.NaN)
                     val ch = o.optDouble("changePercent", Double.NaN)
