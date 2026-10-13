@@ -11,6 +11,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -151,9 +153,11 @@ private fun StockNewsWalaScreen() {
     Surface(Modifier.fillMaxSize(), color = Page) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().background(Page).padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(48.dp).background(Color.White, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Default.TrendingUp, null, tint = Blue, modifier = Modifier.size(34.dp))
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.ic_stocknewswala_logo),
+                    contentDescription = "StockNewsWala logo",
+                    modifier = Modifier.size(48.dp)
+                )
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
