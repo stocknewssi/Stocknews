@@ -1,8 +1,8 @@
-StockNews V3
+Stock News Wala V3
 API-ready Cloudflare Workers structure.
 
 Includes:
-- frontend-ready StockNews structure
+- frontend-ready Stock News Wala structure
 - Cloudflare Worker backend endpoint /api/health
 - safe place to add a licensed market-data provider
 - Wrangler configuration
