@@ -771,7 +771,7 @@ export default {
     }
 
     if (url.pathname === "/robots.txt" && request.method === "GET") {
-      const robots = "User-agent: *\\nAllow: /\\nSitemap: https://stocknews.stocknews1822.workers.dev/sitemap.xml\\n";
+      const robots = "User-agent: *\nAllow: /\nSitemap: https://stocknews.stocknews1822.workers.dev/sitemap.xml\n";
       return new Response(robots, {
         status: 200,
         headers: {
