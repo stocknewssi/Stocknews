@@ -1,4 +1,4 @@
-/* StockNews market experience: full exchange directory + on-demand Angel One quotes */
+/* Stock News Wala market experience: full exchange directory + on-demand Angel One quotes */
 (() => {
   "use strict";
   const $ = (s, root=document) => root.querySelector(s);
@@ -15,10 +15,10 @@
     return data;
   }
   function nav() {
-    return `<div class="sn-top"><a class="sn-brand" href="#/">Stock<span>News</span></a><nav><a href="#/">होम</a><a href="#/stocks">सभी स्टॉक</a><a href="#/screener">स्टॉक स्क्रीनर</a><a href="#/news">न्यूज़</a></nav></div>`;
+    return `<div class="sn-top"><a class="sn-brand" href="#/">Stock News Wala</a><nav><a href="#/">होम</a><a href="#/stocks">सभी स्टॉक</a><a href="#/screener">स्टॉक स्क्रीनर</a><a href="#/news">न्यूज़</a></nav></div>`;
   }
   function shell(body) {
-    app().innerHTML = `<div class="sn-shell">${nav()}<main class="sn-main">${body}</main><footer class="sn-footer">StockNews · NSE/BSE equities · कीमतें Angel One डेटा उपलब्धता के अनुसार</footer></div>`;
+    app().innerHTML = `<div class="sn-shell">${nav()}<main class="sn-main">${body}</main><footer class="sn-footer">Stock News Wala · NSE/BSE equities · कीमतें Angel One डेटा उपलब्धता के अनुसार</footer></div>`;
   }
   function searchBox() {
     return `<div class="sn-search"><span>⌕</span><input id="sn-q" value="${safe(state.query)}" placeholder="कंपनी का नाम या शेयर सिंबल खोजें — जैसे TCS, Reliance, SBI" autocomplete="off"><select id="sn-ex"><option value="">NSE + BSE</option><option value="NSE" ${state.exchange==="NSE"?"selected":""}>केवल NSE</option><option value="BSE" ${state.exchange==="BSE"?"selected":""}>केवल BSE</option></select><button id="sn-find">खोजें</button></div>`;
