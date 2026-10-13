@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://stocknews.stocknews1822.workers.dev/sitemap.xml
+Sitemap: https://stocknewswala.stocknews1822.workers.dev/sitemap.xml
