@@ -1,5 +1,5 @@
 /* =========================================================
-   STOCKNEWS — PROFESSIONAL LIVE STOCK DASHBOARD
+   STOCK NEWS WALA — PROFESSIONAL LIVE STOCK DASHBOARD
    Angel One Backend + Admin + News + Screener
    ========================================================= */
 
@@ -814,7 +814,7 @@ function newsPage() {
     <div class="page-header">
 
       <div>
-        <span class="eyebrow">STOCKNEWS</span>
+        <span class="eyebrow">STOCK NEWS WALA</span>
         <h1>Latest Market News</h1>
         <p class="muted">
           Latest market updates and editorial summaries.
@@ -855,7 +855,7 @@ function newsPage() {
                 </p>
 
                 <div class="news-footer">
-                  <span>StockNews</span>
+                  <span>Stock News Wala</span>
                   <span>→</span>
                 </div>
 
@@ -1271,7 +1271,7 @@ function adminLogin() {
         </div>
 
         <span class="eyebrow">
-          STOCKNEWS ADMIN
+          STOCK NEWS WALA ADMIN
         </span>
 
         <h1>Welcome Back</h1>
@@ -1329,7 +1329,7 @@ function admin() {
           <span class="eyebrow">CONTROL PANEL</span>
           <h1>Admin Dashboard</h1>
           <p class="muted">
-            Publish and manage StockNews market updates.
+            Publish and manage Stock News Wala market updates.
           </p>
         </div>
 
