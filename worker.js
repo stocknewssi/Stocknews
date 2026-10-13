@@ -750,6 +750,38 @@ export default {
     }
 
     /* =====================================
+       SEARCH ENGINE SITEMAP + ROBOTS
+       ===================================== */
+
+    if (url.pathname === "/sitemap.xml" && request.method === "GET") {
+      const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://stocknews.stocknews1822.workers.dev/</loc>
+  </url>
+</urlset>`;
+      return new Response(sitemap, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/xml; charset=UTF-8",
+          "Cache-Control": "public, max-age=3600",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+
+    if (url.pathname === "/robots.txt" && request.method === "GET") {
+      const robots = "User-agent: *\\nAllow: /\\nSitemap: https://stocknews.stocknews1822.workers.dev/sitemap.xml\\n";
+      return new Response(robots, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/plain; charset=UTF-8",
+          "Cache-Control": "public, max-age=3600"
+        }
+      });
+    }
+
+    /* =====================================
        WEBSITE FILES
        ===================================== */
 
