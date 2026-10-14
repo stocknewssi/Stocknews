@@ -31,12 +31,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-private val Navy = Color(0xFF102E59)
-private val Blue = Color(0xFF1479F5)
-private val Green = Color(0xFF08B85A)
-private val Red = Color(0xFFEF4056)
-private val Page = Color(0xFFF2F8FE)
-private val Muted = Color(0xFF71839B)
+private val Navy = Color(0xFF202124)
+private val Blue = Color(0xFF00A86B)
+private val Green = Color(0xFF00A86B)
+private val Red = Color(0xFFE5484D)
+private val Page = Color(0xFFFFFFFF)
+private val Muted = Color(0xFF777B80)
 
 data class StockItem(val symbol: String, val name: String, val exchange: String, val tradingSymbol: String)
 data class Quote(val price: String, val changePercent: String)
@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme(colorScheme = lightColorScheme(primary = Blue, background = Page, surface = Color.White)) {
+            MaterialTheme(colorScheme = lightColorScheme(primary = Green, background = Color.White, surface = Color.White, onSurface = Navy)) {
                 StockNewsWalaScreen()
             }
         }
@@ -129,7 +129,7 @@ private fun StockNewsWalaScreen() {
         }
     }
     @Composable fun surfaceCard(content: @Composable ColumnScope.() -> Unit) {
-        Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 2.dp), modifier = Modifier.fillMaxWidth()) {
+        Card(shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = Color.White), elevation = CardDefaults.cardElevation(defaultElevation = 0.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp), content = content)
         }
     }
@@ -152,7 +152,7 @@ private fun StockNewsWalaScreen() {
 
     Surface(Modifier.fillMaxSize(), color = Page) {
         Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().background(Page).padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_stocknewswala_logo),
                     contentDescription = "StockNewsWala logo",
@@ -164,10 +164,10 @@ private fun StockNewsWalaScreen() {
                         Text("StockNews", color = Navy, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
                         Text("Wala", color = Blue, fontSize = 23.sp, fontWeight = FontWeight.ExtraBold)
                     }
-                    Text("Indian Stock Market", color = Muted, fontSize = 12.sp)
+                    Text("INDIAN MARKETS  •  NSE / BSE", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Medium)
                 }
                 Surface(color = Color(0xFFE5F9EF), shape = RoundedCornerShape(24.dp)) {
-                    Text("● NSE • BSE", Modifier.padding(horizontal = 11.dp, vertical = 9.dp), color = Color(0xFF16814B), fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text("MARKET", Modifier.padding(horizontal = 12.dp, vertical = 8.dp), color = Green, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                 }
             }
             if (selectedStock != null && tab != "Paper Trading") {
@@ -323,7 +323,7 @@ private fun StockNewsWalaScreen() {
                     }
                 }
             }
-            NavigationBar(containerColor = Color.White) {
+            NavigationBar(containerColor = Color.White, tonalElevation = 0.dp) {
                 listOf(Triple("Home", Icons.Default.Home, "Home"), Triple("Stocks", Icons.Default.BarChart, "Stocks"), Triple("Practice", Icons.Default.AccountBalanceWallet, "Paper Trading"), Triple("Screener", Icons.Default.Search, "Screener"), Triple("News", Icons.Default.Article, "News"), Triple("Admin", Icons.Default.Settings, "Admin")).forEach { (label, icon, destination) ->
                     NavigationBarItem(selected = tab == destination, onClick = { tab = destination; if (destination == "Stocks" || destination == "Screener") scope.launch { loadStocks(query, exchange) } }, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 10.sp) })
                 }
