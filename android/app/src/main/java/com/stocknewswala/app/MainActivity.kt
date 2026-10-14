@@ -45,6 +45,7 @@ private val Muted = Color(0xFF777B80)
 
 data class StockItem(val symbol: String, val name: String, val exchange: String, val tradingSymbol: String)
 data class Quote(val price: String, val changePercent: String)
+data class MarketMover(val stock: StockItem, val price: String, val changePercent: Double)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +69,8 @@ private fun StockNewsWalaScreen() {
     var quoteLoading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var quoteError by remember { mutableStateOf<String?>(null) }
+    var marketMovers by remember { mutableStateOf<List<MarketMover>>(emptyList()) }
+    var moversLoading by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf("Home") }
     val scope = rememberCoroutineScope()
 
@@ -122,7 +125,43 @@ private fun StockNewsWalaScreen() {
         finally { quoteLoading = false }
     }
 
+    suspend fun loadMarketMovers(items: List<StockItem>) {
+        if (items.isEmpty()) return
+        moversLoading = true
+        try {
+            marketMovers = withContext(Dispatchers.IO) {
+                val symbols = items.take(50).joinToString(",") { it.tradingSymbol }
+                val url = URL(BuildConfig.API_BASE_URL + "api/market?symbols=" + URLEncoder.encode(symbols, "UTF-8"))
+                val c = url.openConnection() as HttpURLConnection
+                c.connectTimeout = 15000
+                c.readTimeout = 20000
+                try {
+                    val code = c.responseCode
+                    val body = (if (code in 200..299) c.inputStream else c.errorStream).bufferedReader().use { it.readText() }
+                    if (code !in 200..299) throw IllegalStateException("Market quotes unavailable")
+                    val root = JSONObject(body)
+                    if (!root.optBoolean("success")) throw IllegalStateException("Market quotes unavailable")
+                    val arr = root.optJSONArray("prices") ?: JSONArray()
+                    buildList {
+                        for (i in 0 until arr.length()) {
+                            val o = arr.optJSONObject(i) ?: continue
+                            val symbol = o.optString("symbol")
+                            val tradingSymbol = o.optString("tradingSymbol")
+                            val stock = items.firstOrNull { it.symbol.equals(symbol, true) || it.tradingSymbol.equals(tradingSymbol, true) } ?: continue
+                            val change = o.optDouble("changePercent", Double.NaN)
+                            val price = o.optDouble("price", Double.NaN)
+                            if (change.isFinite() && price.isFinite()) add(MarketMover(stock, "₹" + String.format("%.2f", price), change))
+                        }
+                    }
+                } finally { c.disconnect() }
+            }
+        } catch (_: Exception) {
+            marketMovers = emptyList()
+        } finally { moversLoading = false }
+    }
+
     LaunchedEffect(query, exchange) { loadStocks(query, exchange) }
+    LaunchedEffect(stocks) { if (stocks.isNotEmpty()) loadMarketMovers(stocks) }
 
     @Composable fun heading(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color = Blue, action: String = "सभी देखें") {
         Row(Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -229,15 +268,31 @@ private fun StockNewsWalaScreen() {
                     item { heading("Top Gainers", Icons.Default.TrendingUp, Green, "View All") }
                     item {
                         surfaceCard {
-                            Text("यह सूची तभी सही होगी जब API सभी शेयरों का लाइव प्रतिशत बदलाव दे। अभी उपलब्ध डेटा से Top Gainers की रैंकिंग सत्यापित नहीं हो सकती।", color = Muted, fontSize = 12.sp)
-                            TextButton(onClick = { tab = "Stocks" }) { Text("शेयर खोजें", color = Green) }
+                            val chosen = marketMovers.filter { it.changePercent >= 0 }.sortedByDescending { it.changePercent }.take(5)
+                            if (moversLoading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green)
+                            else if (chosen.isEmpty()) Text("लाइव Top Gainers उपलब्ध नहीं हैं। API से भाव मिलने पर सूची दिखेगी।", color = Muted, fontSize = 12.sp)
+                            else chosen.forEach { mover ->
+                                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) { Text(mover.stock.symbol, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 13.sp); Text(mover.stock.name, color = Muted, fontSize = 10.sp, maxLines = 1) }
+                                    Column(horizontalAlignment = Alignment.End) { Text(mover.price, color = Navy, fontSize = 12.sp); Text("+" + String.format("%.2f", mover.changePercent) + "%", color = Green, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+                                }
+                                HorizontalDivider(color = Color(0xFFF0F1F3))
+                            }
                         }
                     }
                     item { heading("Top Losers", Icons.Default.TrendingDown, Red, "View All") }
                     item {
                         surfaceCard {
-                            Text("Top Losers की सही रैंकिंग के लिए सभी शेयरों के वास्तविक प्रतिशत बदलाव की जरूरत है। यह डेटा अभी API से उपलब्ध नहीं है।", color = Muted, fontSize = 12.sp)
-                            TextButton(onClick = { tab = "Stocks" }) { Text("शेयर खोजें", color = Red) }
+                            val chosen = marketMovers.filter { it.changePercent < 0 }.sortedBy { it.changePercent }.take(5)
+                            if (moversLoading) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Red)
+                            else if (chosen.isEmpty()) Text("लाइव Top Losers उपलब्ध नहीं हैं। API से भाव मिलने पर सूची दिखेगी।", color = Muted, fontSize = 12.sp)
+                            else chosen.forEach { mover ->
+                                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) { Text(mover.stock.symbol, color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 13.sp); Text(mover.stock.name, color = Muted, fontSize = 10.sp, maxLines = 1) }
+                                    Column(horizontalAlignment = Alignment.End) { Text(mover.price, color = Navy, fontSize = 12.sp); Text(String.format("%.2f", mover.changePercent) + "%", color = Red, fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+                                }
+                                HorizontalDivider(color = Color(0xFFF0F1F3))
+                            }
                         }
                     }
                     item { heading("Sector View", Icons.Default.PieChart, Color(0xFF8A35E8)) }
