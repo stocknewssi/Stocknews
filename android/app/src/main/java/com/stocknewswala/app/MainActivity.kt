@@ -313,7 +313,7 @@ private fun StockNewsWalaScreen() {
                     }
                 }
             }
-            if (selectedStock != null) {
+            if (selectedStock != null && tab != "Paper Trading") {
                 Surface(color = Color.White, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
