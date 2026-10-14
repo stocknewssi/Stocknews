@@ -170,7 +170,17 @@ private fun StockNewsWalaScreen() {
                     Text("● NSE • BSE", Modifier.padding(horizontal = 11.dp, vertical = 9.dp), color = Color(0xFF16814B), fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
-            if (tab == "Home") {
+            if (selectedStock != null && tab != "Paper Trading") {
+                StockDetailScreen(
+                    stock = selectedStock!!,
+                    quote = quote,
+                    loading = quoteLoading,
+                    error = quoteError,
+                    onBack = { selectedStock = null; quote = null; quoteError = null },
+                    onBuy = { tab = "Paper Trading" },
+                    onRefresh = { scope.launch { loadQuote(selectedStock!!) } }
+                )
+            } else if (tab == "Home") {
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                     item {
                         surfaceCard {
@@ -313,21 +323,163 @@ private fun StockNewsWalaScreen() {
                     }
                 }
             }
-            if (selectedStock != null && tab != "Paper Trading") {
-                Surface(color = Color.White, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) { Text(selectedStock!!.symbol, color = Navy, fontWeight = FontWeight.Bold, fontSize = 18.sp); Text(selectedStock!!.name + " • " + selectedStock!!.exchange, color = Muted, fontSize = 12.sp) }
-                            IconButton(onClick = { selectedStock = null; quote = null; quoteError = null }) { Icon(Icons.Default.Close, null) }
-                        }
-                        when { quoteLoading -> CircularProgressIndicator(); quote != null -> { Text(quote!!.price, color = Navy, fontSize = 25.sp, fontWeight = FontWeight.Bold); Text("दैनिक बदलाव: " + quote!!.changePercent, color = Green) }; quoteError != null -> Text(quoteError!!, color = Red) }
-                        Text("भाव बदलने पर दोबारा शेयर चुनकर अपडेट करें।", color = Muted, fontSize = 10.sp)
-                    }
-                }
-            }
             NavigationBar(containerColor = Color.White) {
                 listOf(Triple("Home", Icons.Default.Home, "Home"), Triple("Stocks", Icons.Default.BarChart, "Stocks"), Triple("Practice", Icons.Default.AccountBalanceWallet, "Paper Trading"), Triple("Screener", Icons.Default.Search, "Screener"), Triple("News", Icons.Default.Article, "News"), Triple("Admin", Icons.Default.Settings, "Admin")).forEach { (label, icon, destination) ->
                     NavigationBarItem(selected = tab == destination, onClick = { tab = destination; if (destination == "Stocks" || destination == "Screener") scope.launch { loadStocks(query, exchange) } }, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 10.sp) })
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun StockDetailScreen(
+    stock: StockItem,
+    quote: Quote?,
+    loading: Boolean,
+    error: String?,
+    onBack: () -> Unit,
+    onBuy: () -> Unit,
+    onRefresh: () -> Unit
+) {
+    var detailTab by remember(stock.symbol) { mutableStateOf("Overview") }
+    var range by remember(stock.symbol) { mutableStateOf("1D") }
+    val positive = !(quote?.changePercent ?: "").trim().startsWith("-")
+    Column(Modifier.fillMaxSize().background(Color.White)) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Navy) }
+            Column(Modifier.weight(1f)) {
+                Text(stock.symbol, color = Navy, fontWeight = FontWeight.Bold, fontSize = 19.sp)
+                Text(stock.name + " • " + stock.exchange, color = Muted, fontSize = 11.sp, maxLines = 1)
+            }
+            IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, contentDescription = "Refresh quote", tint = Blue) }
+            IconButton(onClick = {}) { Icon(Icons.Default.StarBorder, contentDescription = "Watchlist", tint = Navy) }
+        }
+        HorizontalDivider(color = Color(0xFFF0F1F3))
+        LazyColumn(
+            Modifier.weight(1f),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            item {
+                Column {
+                    when {
+                        loading -> LinearProgressIndicator(Modifier.fillMaxWidth())
+                        quote != null -> {
+                            Text(quote.price, color = Color(0xFF202124), fontSize = 31.sp, fontWeight = FontWeight.Bold)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(if (positive) Icons.Default.TrendingUp else Icons.Default.TrendingDown, null, tint = if (positive) Green else Red, modifier = Modifier.size(17.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text(quote.changePercent, color = if (positive) Green else Red, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text("  आज", color = Muted, fontSize = 12.sp)
+                            }
+                        }
+                        error != null -> Text(error, color = Red, fontSize = 13.sp)
+                        else -> Text("भाव उपलब्ध नहीं", color = Muted, fontSize = 14.sp)
+                    }
+                    Spacer(Modifier.height(5.dp))
+                    Text("भाव डेटा स्रोत से उपलब्ध होने पर अपडेट होगा", color = Muted, fontSize = 10.sp)
+                }
+            }
+            item {
+                Column {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                        listOf("1D", "1W", "1M", "3M", "1Y", "5Y").forEach { item ->
+                            FilterChip(
+                                selected = range == item,
+                                onClick = { range = item },
+                                label = { Text(item, fontSize = 11.sp) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                Modifier.fillMaxWidth().height(178.dp).background(Color(0xFFFAFBFC), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(Icons.Default.ShowChart, null, tint = Color(0xFFB6C0CC), modifier = Modifier.size(36.dp))
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("ऐतिहासिक चार्ट डेटा उपलब्ध नहीं", color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                    Text("यहाँ वास्तविक प्राइस/कैंडल चार्ट दिखाने के लिए डेटा कनेक्शन चाहिए।", color = Muted, fontSize = 10.sp)
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                Text("Open", color = Muted, fontSize = 11.sp)
+                                Text("High", color = Muted, fontSize = 11.sp)
+                                Text("Low", color = Muted, fontSize = 11.sp)
+                                Text("Volume", color = Muted, fontSize = 11.sp)
+                            }
+                            Text("ये विवरण अभी उपलब्ध नहीं हैं", color = Muted, fontSize = 10.sp, modifier = Modifier.align(Alignment.Start))
+                        }
+                    }
+                }
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    listOf("Overview", "Technicals", "News", "Events").forEach { item ->
+                        FilterChip(
+                            selected = detailTab == item,
+                            onClick = { detailTab = item },
+                            label = { Text(item, fontSize = 10.sp) }
+                        )
+                    }
+                }
+            }
+            item {
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFFAFBFC)), shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(15.dp)) {
+                        when (detailTab) {
+                            "Overview" -> {
+                                Text("About " + stock.name, color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(7.dp))
+                                Text(stock.name + " (" + stock.symbol + ") के कंपनी विवरण, मूल्य सीमा और प्रमुख आँकड़े उपलब्ध डेटा स्रोत से जुड़ने पर यहाँ दिखेंगे।", color = Muted, fontSize = 12.sp)
+                            }
+                            "Technicals" -> {
+                                Text("Technical indicators", color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(7.dp))
+                                listOf("RSI", "EMA", "Pivot Points", "Volume").forEach { label ->
+                                    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(label, color = Navy, modifier = Modifier.weight(1f), fontSize = 13.sp)
+                                        Text("डेटा उपलब्ध नहीं", color = Muted, fontSize = 11.sp)
+                                    }
+                                    HorizontalDivider(color = Color(0xFFE9EDF2))
+                                }
+                            }
+                            "News" -> {
+                                Text("Latest news", color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(7.dp))
+                                Text("इस शेयर की सत्यापित खबरें दिखाने के लिए न्यूज़ फ़ीड कनेक्शन आवश्यक है।", color = Muted, fontSize = 12.sp)
+                            }
+                            else -> {
+                                Text("Events", color = Navy, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.height(7.dp))
+                                Text("कंपनी के नतीजे, डिविडेंड और अन्य इवेंट डेटा उपलब्ध होने पर यहाँ दिखेंगे।", color = Muted, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Surface(shadowElevation = 10.dp, color = Color.White) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(onClick = onBuy, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp)) {
+                    Text("Sell", color = Red, fontWeight = FontWeight.Bold)
+                }
+                Button(onClick = onBuy, modifier = Modifier.weight(1f).height(48.dp), shape = RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = Green)) {
+                    Text("Buy", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
