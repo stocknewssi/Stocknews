@@ -3,6 +3,7 @@ package com.stocknewswala.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -20,12 +21,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
@@ -341,7 +346,56 @@ private fun StockDetailScreen(
 ) {
     var detailTab by remember(stock.symbol) { mutableStateOf("Overview") }
     var range by remember(stock.symbol) { mutableStateOf("1D") }
+    var candles by remember(stock.symbol) { mutableStateOf<List<List<Float>>>(emptyList()) }
+    var candlesLoading by remember(stock.symbol) { mutableStateOf(false) }
+    var candlesError by remember(stock.symbol) { mutableStateOf<String?>(null) }
     val positive = !(quote?.changePercent ?: "").trim().startsWith("-")
+
+    LaunchedEffect(stock.symbol, stock.exchange, range) {
+        candlesLoading = true
+        candlesError = null
+        candles = emptyList()
+        val interval = when (range) {
+            "1D" -> "FIVE_MINUTE"
+            "1W" -> "FIFTEEN_MINUTE"
+            "1M" -> "ONE_HOUR"
+            else -> "ONE_DAY"
+        }
+        try {
+            candles = withContext(Dispatchers.IO) {
+                val url = URL(BuildConfig.API_BASE_URL + "api/candles?symbol=" + URLEncoder.encode(stock.tradingSymbol, "UTF-8") +
+                    "&exchange=" + URLEncoder.encode(stock.exchange, "UTF-8") + "&interval=" + interval)
+                val c = url.openConnection() as HttpURLConnection
+                c.connectTimeout = 15000
+                c.readTimeout = 20000
+                try {
+                    val code = c.responseCode
+                    val body = (if (code in 200..299) c.inputStream else c.errorStream).bufferedReader().use { it.readText() }
+                    if (code !in 200..299) throw IllegalStateException("Historical data unavailable")
+                    val root = JSONObject(body)
+                    if (!root.optBoolean("success")) throw IllegalStateException(root.optString("error", "Historical data unavailable"))
+                    val arr = root.optJSONArray("candles") ?: JSONArray()
+                    buildList {
+                        for (i in 0 until arr.length()) {
+                            val row = arr.optJSONArray(i) ?: continue
+                            if (row.length() >= 5) {
+                                val open = row.optDouble(1, Double.NaN).toFloat()
+                                val high = row.optDouble(2, Double.NaN).toFloat()
+                                val low = row.optDouble(3, Double.NaN).toFloat()
+                                val close = row.optDouble(4, Double.NaN).toFloat()
+                                if (open.isFinite() && high.isFinite() && low.isFinite() && close.isFinite()) add(listOf(open, high, low, close))
+                            }
+                        }
+                    }
+                } finally { c.disconnect() }
+            }
+            if (candles.isEmpty()) candlesError = "इस अवधि के लिए चार्ट डेटा उपलब्ध नहीं है।"
+        } catch (_: Exception) {
+            candlesError = "ऐतिहासिक चार्ट डेटा नहीं मिल सका।"
+        } finally {
+            candlesLoading = false
+        }
+    }
     Column(Modifier.fillMaxSize().background(Color.White)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
@@ -404,11 +458,37 @@ private fun StockDetailScreen(
                                 Modifier.fillMaxWidth().height(178.dp).background(Color(0xFFFAFBFC), RoundedCornerShape(8.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Default.ShowChart, null, tint = Color(0xFFB6C0CC), modifier = Modifier.size(36.dp))
-                                    Spacer(Modifier.height(8.dp))
-                                    Text("ऐतिहासिक चार्ट डेटा उपलब्ध नहीं", color = Navy, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                    Text("यहाँ वास्तविक प्राइस/कैंडल चार्ट दिखाने के लिए डेटा कनेक्शन चाहिए।", color = Muted, fontSize = 10.sp)
+                                when {
+                                    candlesLoading -> CircularProgressIndicator(color = Green, modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
+                                    candles.size >= 2 -> {
+                                        val values = candles.map { it[3] }
+                                        val minValue = values.minOrNull() ?: 0f
+                                        val maxValue = values.maxOrNull() ?: 1f
+                                        val spread = (maxValue - minValue).takeIf { it > 0f } ?: 1f
+                                        Canvas(Modifier.fillMaxSize().padding(8.dp)) {
+                                            val left = 4f
+                                            val right = size.width - 4f
+                                            val top = 8f
+                                            val bottom = size.height - 8f
+                                            for (grid in 0..3) {
+                                                val y = top + (bottom - top) * grid / 3f
+                                                drawLine(Color(0xFFE8ECEF), androidx.compose.ui.geometry.Offset(left, y), androidx.compose.ui.geometry.Offset(right, y), strokeWidth = 1f)
+                                            }
+                                            val path = Path()
+                                            values.forEachIndexed { index, value ->
+                                                val x = left + (right - left) * index / (values.size - 1).toFloat()
+                                                val y = bottom - ((value - minValue) / spread) * (bottom - top)
+                                                if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                                            }
+                                            drawPath(path, color = Green, style = Stroke(width = 3f, cap = StrokeCap.Round))
+                                        }
+                                    }
+                                    candlesError != null -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(Icons.Default.ShowChart, null, tint = Color(0xFFB6C0CC), modifier = Modifier.size(30.dp))
+                                        Spacer(Modifier.height(6.dp))
+                                        Text(candlesError!!, color = Muted, fontSize = 11.sp)
+                                    }
+                                    else -> Text("चार्ट डेटा लोड हो रहा है…", color = Muted, fontSize = 12.sp)
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
@@ -418,7 +498,7 @@ private fun StockDetailScreen(
                                 Text("Low", color = Muted, fontSize = 11.sp)
                                 Text("Volume", color = Muted, fontSize = 11.sp)
                             }
-                            Text("ये विवरण अभी उपलब्ध नहीं हैं", color = Muted, fontSize = 10.sp, modifier = Modifier.align(Alignment.Start))
+                            Text(if (candles.isNotEmpty()) "ऐतिहासिक कैंडल डेटा • " + candles.size + " points" else "Open, High, Low और Volume डेटा उपलब्ध नहीं", color = Muted, fontSize = 10.sp, modifier = Modifier.align(Alignment.Start))
                         }
                     }
                 }
