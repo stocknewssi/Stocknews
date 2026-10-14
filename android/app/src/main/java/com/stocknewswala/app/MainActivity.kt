@@ -267,7 +267,17 @@ private fun StockNewsWalaScreen() {
                     Spacer(Modifier.height(8.dp))
                     Text(when (tab) { "Stocks" -> "सभी शेयर"; "Screener" -> "स्टॉक स्क्रीनर"; "News" -> "मार्केट न्यूज़"; else -> "एडमिन" }, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Navy)
                     Spacer(Modifier.height(10.dp))
-                    if (tab == "News") {
+                    if (tab == "Paper Trading") {
+                        PaperTradingScreen(
+                            stocks = stocks,
+                            selectedStock = selectedStock,
+                            quote = quote,
+                            quoteLoading = quoteLoading,
+                            quoteError = quoteError,
+                            onSelectStock = { s -> selectedStock = s; scope.launch { loadQuote(s) } },
+                            onClearSelection = { selectedStock = null; quote = null; quoteError = null }
+                        )
+                    } else if (tab == "News") {
                         surfaceCard {
                             Text("Latest Market News", fontWeight = FontWeight.Bold, color = Navy)
                             Spacer(Modifier.height(8.dp))
@@ -316,7 +326,7 @@ private fun StockNewsWalaScreen() {
                 }
             }
             NavigationBar(containerColor = Color.White) {
-                listOf(Triple("Home", Icons.Default.Home, "Home"), Triple("Stocks", Icons.Default.BarChart, "Stocks"), Triple("Screener", Icons.Default.Search, "Screener"), Triple("News", Icons.Default.Article, "News"), Triple("Admin", Icons.Default.Settings, "Admin")).forEach { (label, icon, destination) ->
+                listOf(Triple("Home", Icons.Default.Home, "Home"), Triple("Stocks", Icons.Default.BarChart, "Stocks"), Triple("Practice", Icons.Default.AccountBalanceWallet, "Paper Trading"), Triple("Screener", Icons.Default.Search, "Screener"), Triple("News", Icons.Default.Article, "News"), Triple("Admin", Icons.Default.Settings, "Admin")).forEach { (label, icon, destination) ->
                     NavigationBarItem(selected = tab == destination, onClick = { tab = destination; if (destination == "Stocks" || destination == "Screener") scope.launch { loadStocks(query, exchange) } }, icon = { Icon(icon, null) }, label = { Text(label, fontSize = 10.sp) })
                 }
             }
