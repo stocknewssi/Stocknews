@@ -79,7 +79,7 @@ fun PaperTradingScreen(
     val holding = selectedStock?.let { s -> holdings.firstOrNull { it.symbol == s.symbol && it.name == s.name } }
     val filteredStocks = stocks.filter { search.isBlank() || it.symbol.contains(search, true) || it.name.contains(search, true) }.take(30)
 
-    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().heightIn(min = 0.dp)) {
         Card(colors = CardDefaults.cardColors(containerColor = Color(0xFF102E59)), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -136,6 +136,32 @@ fun PaperTradingScreen(
                                 quoteError != null -> Text(quoteError, color = Color(0xFFCF293D), fontSize = 12.sp)
                                 else -> Text("भाव लोड हो रहा है…", color = Color(0xFF71839B), fontSize = 12.sp)
                             }
+                            if (quote != null) {
+                                val positive = !quote.changePercent.trim().startsWith("-")
+                                Surface(
+                                    color = if (positive) Color(0xFFE8F8EF) else Color(0xFFFFECEF),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.padding(top = 8.dp)
+                                ) {
+                                    Row(Modifier.padding(horizontal = 10.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(if (positive) Icons.Default.TrendingUp else Icons.Default.TrendingDown, null, tint = if (positive) Color(0xFF16814B) else Color(0xFFCF293D), modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(5.dp))
+                                        Text(quote.changePercent, color = if (positive) Color(0xFF16814B) else Color(0xFFCF293D), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Surface(color = Color(0xFFF3F7FC), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.ShowChart, null, tint = Color(0xFF1479F5), modifier = Modifier.size(22.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        Text("प्राइस चार्ट", color = Color(0xFF102E59), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                        Text("ऐतिहासिक कैंडल डेटा उपलब्ध होने पर चार्ट दिखेगा", color = Color(0xFF71839B), fontSize = 10.sp)
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.height(8.dp))
                             Text("केवल अभ्यास • यह असली ऑर्डर नहीं है", color = Color(0xFF71839B), fontSize = 10.sp)
                             Spacer(Modifier.height(10.dp))
                             OutlinedTextField(value = quantityText, onValueChange = { quantityText = it.filter(Char::isDigit).take(7) }, label = { Text("कितने शेयर?") }, singleLine = true, modifier = Modifier.fillMaxWidth())
