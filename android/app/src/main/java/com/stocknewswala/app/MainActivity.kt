@@ -224,19 +224,15 @@ private fun StockNewsWalaScreen() {
                     item { heading("Top Gainers", Icons.Default.TrendingUp, Green, "View All") }
                     item {
                         surfaceCard {
-                            val picks = listOf("TATAMOTORS", "SBIN", "BAJFINANCE", "ONGC", "ITC")
-                            val chosen = picks.mapNotNull { symbol -> stocks.firstOrNull { it.symbol.equals(symbol, true) } }
-                            if (chosen.isEmpty()) Text("बढ़ने वाले शेयर देखने के लिए Stocks खोलें। लाइव प्रतिशत उपलब्ध होने पर ही दिखेगा।", color = Muted, fontSize = 12.sp)
-                            else chosen.take(5).forEach { stockRow(it, Green) }
+                            Text("यह सूची तभी सही होगी जब API सभी शेयरों का लाइव प्रतिशत बदलाव दे। अभी उपलब्ध डेटा से Top Gainers की रैंकिंग सत्यापित नहीं हो सकती।", color = Muted, fontSize = 12.sp)
+                            TextButton(onClick = { tab = "Stocks" }) { Text("शेयर खोजें", color = Green) }
                         }
                     }
                     item { heading("Top Losers", Icons.Default.TrendingDown, Red, "View All") }
                     item {
                         surfaceCard {
-                            val picks = listOf("HINDUNILVR", "ICICIBANK", "AXISBANK", "KOTAKBANK", "WIPRO")
-                            val chosen = picks.mapNotNull { symbol -> stocks.firstOrNull { it.symbol.equals(symbol, true) } }
-                            if (chosen.isEmpty()) Text("गिरने वाले शेयर देखने के लिए Stocks खोलें। लाइव प्रतिशत उपलब्ध होने पर ही दिखेगा।", color = Muted, fontSize = 12.sp)
-                            else chosen.take(5).forEach { stockRow(it, Red) }
+                            Text("Top Losers की सही रैंकिंग के लिए सभी शेयरों के वास्तविक प्रतिशत बदलाव की जरूरत है। यह डेटा अभी API से उपलब्ध नहीं है।", color = Muted, fontSize = 12.sp)
+                            TextButton(onClick = { tab = "Stocks" }) { Text("शेयर खोजें", color = Red) }
                         }
                     }
                     item { heading("Sector View", Icons.Default.PieChart, Color(0xFF8A35E8)) }
