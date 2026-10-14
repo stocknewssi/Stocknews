@@ -162,7 +162,22 @@ fun PaperTradingScreen(
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
-                            Text("केवल अभ्यास • यह असली ऑर्डर नहीं है", color = Color(0xFF71839B), fontSize = 10.sp)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("दैनिक बदलाव", color = Color(0xFF71839B), fontSize = 11.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(quote?.changePercent ?: "—", color = if ((quote?.changePercent ?: "").startsWith("-")) Color(0xFFCF293D) else Color(0xFF08A85A), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFF2F8FE)), shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text("Price chart", color = Color(0xFF102E59), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                        Text("1D  1W  1M  1Y", color = Color(0xFF1479F5), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                    Spacer(Modifier.height(8.dp))
+                                    Text("ऐतिहासिक चार्ट डेटा अभी उपलब्ध नहीं है। डेटा कनेक्ट होने पर यहाँ वास्तविक प्राइस चार्ट दिखेगा।", color = Color(0xFF71839B), fontSize = 11.sp)
+                                }
+                            }
                             Spacer(Modifier.height(10.dp))
                             OutlinedTextField(value = quantityText, onValueChange = { quantityText = it.filter(Char::isDigit).take(7) }, label = { Text("कितने शेयर?") }, singleLine = true, modifier = Modifier.fillMaxWidth())
                             val total = (price ?: 0.0) * quantity.coerceAtLeast(0)
