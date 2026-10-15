@@ -34,6 +34,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
@@ -157,32 +160,34 @@ private fun StockNewsWalaScreen() {
             Triple("NIFTY AUTO", "%5ECNXAUTO", "NIFTY AUTO"),
             Triple("NIFTY PHARMA", "%5ECNXPHARMA", "NIFTY PHARMA")
         )
-        buildList {
-            indexes.forEach { (label, ticker, display) ->
-                var connection: HttpURLConnection? = null
-                try {
-                    val url = URL("https://query1.finance.yahoo.com/v8/finance/chart/" + ticker + "?range=1d&interval=1m")
-                    connection = url.openConnection() as HttpURLConnection
-                    connection.connectTimeout = 9000
-                    connection.readTimeout = 9000
-                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 StockNewsWala/1.0")
-                    val code = connection.responseCode
-                    if (code !in 200..299) throw IllegalStateException("Index quote unavailable")
-                    val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-                    val chart = root.optJSONObject("chart") ?: throw IllegalStateException("No chart")
-                    val result = chart.optJSONArray("result")?.optJSONObject(0) ?: throw IllegalStateException("No result")
-                    val meta = result.optJSONObject("meta") ?: throw IllegalStateException("No metadata")
-                    val price = meta.optDouble("regularMarketPrice", Double.NaN)
-                    val previous = meta.optDouble("chartPreviousClose", meta.optDouble("previousClose", Double.NaN))
-                    if (price.isFinite() && previous.isFinite() && previous != 0.0) {
-                        add(MarketIndexQuote(label, price, ((price - previous) / previous) * 100.0, ticker))
+        coroutineScope {
+            indexes.map { (label, ticker, display) ->
+                async {
+                    var connection: HttpURLConnection? = null
+                    try {
+                        val url = URL("https://query1.finance.yahoo.com/v8/finance/chart/" + ticker + "?range=1d&interval=1m")
+                        connection = url.openConnection() as HttpURLConnection
+                        connection.connectTimeout = 5000
+                        connection.readTimeout = 7000
+                        connection.setRequestProperty("User-Agent", "Mozilla/5.0 StockNewsWala/1.0")
+                        val code = connection.responseCode
+                        if (code !in 200..299) throw IllegalStateException("Index quote unavailable")
+                        val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                        val chart = root.optJSONObject("chart") ?: throw IllegalStateException("No chart")
+                        val result = chart.optJSONArray("result")?.optJSONObject(0) ?: throw IllegalStateException("No result")
+                        val meta = result.optJSONObject("meta") ?: throw IllegalStateException("No metadata")
+                        val price = meta.optDouble("regularMarketPrice", Double.NaN)
+                        val previous = meta.optDouble("chartPreviousClose", meta.optDouble("previousClose", Double.NaN))
+                        if (price.isFinite() && previous.isFinite() && previous != 0.0) {
+                            MarketIndexQuote(label, price, ((price - previous) / previous) * 100.0, ticker)
+                        } else null
+                    } catch (_: Exception) {
+                        null
+                    } finally {
+                        connection?.disconnect()
                     }
-                } catch (_: Exception) {
-                    // Keep other indexes visible if one provider request fails.
-                } finally {
-                    connection?.disconnect()
                 }
-            }
+            }.awaitAll().filterNotNull()
         }
     }
 
@@ -233,7 +238,7 @@ private fun StockNewsWalaScreen() {
             }
             indexesLoading = false
             // Poll at a reasonable interval; the upstream quote provider controls actual update frequency.
-            delay(5_000)
+            delay(60_000)
         }
     }
 
