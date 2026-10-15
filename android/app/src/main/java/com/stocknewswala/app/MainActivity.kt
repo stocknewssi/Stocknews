@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -48,6 +50,7 @@ private val SoftGreen = Color(0xFFE8F8F1)
 data class StockItem(val symbol: String, val name: String, val exchange: String, val tradingSymbol: String)
 data class Quote(val price: String, val changePercent: String)
 data class MarketMover(val stock: StockItem, val price: String, val changePercent: Double)
+data class MarketIndexQuote(val name: String, val price: Double, val changePercent: Double, val ticker: String)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,6 +76,9 @@ private fun StockNewsWalaScreen() {
     var quoteError by remember { mutableStateOf<String?>(null) }
     var marketMovers by remember { mutableStateOf<List<MarketMover>>(emptyList()) }
     var moversLoading by remember { mutableStateOf(false) }
+    var indexQuotes by remember { mutableStateOf<List<MarketIndexQuote>>(emptyList()) }
+    var indexesLoading by remember { mutableStateOf(false) }
+    var indexUpdatedAt by remember { mutableStateOf<Long?>(null) }
     var tab by remember { mutableStateOf("Home") }
     val scope = rememberCoroutineScope()
 
@@ -127,6 +133,41 @@ private fun StockNewsWalaScreen() {
         finally { quoteLoading = false }
     }
 
+    suspend fun loadIndexQuotes(): List<MarketIndexQuote> = withContext(Dispatchers.IO) {
+        val indexes = listOf(
+            Triple("NIFTY 50", "%5ENSEI", "NIFTY 50"),
+            Triple("BANK NIFTY", "%5ENSEBANK", "BANK NIFTY"),
+            Triple("SENSEX", "%5EBSESN", "SENSEX")
+        )
+        buildList {
+            indexes.forEach { (label, ticker, display) ->
+                var connection: HttpURLConnection? = null
+                try {
+                    val url = URL("https://query1.finance.yahoo.com/v8/finance/chart/" + ticker + "?range=1d&interval=1m")
+                    connection = url.openConnection() as HttpURLConnection
+                    connection.connectTimeout = 9000
+                    connection.readTimeout = 9000
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0 StockNewsWala/1.0")
+                    val code = connection.responseCode
+                    if (code !in 200..299) throw IllegalStateException("Index quote unavailable")
+                    val root = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
+                    val chart = root.optJSONObject("chart") ?: throw IllegalStateException("No chart")
+                    val result = chart.optJSONArray("result")?.optJSONObject(0) ?: throw IllegalStateException("No result")
+                    val meta = result.optJSONObject("meta") ?: throw IllegalStateException("No metadata")
+                    val price = meta.optDouble("regularMarketPrice", Double.NaN)
+                    val previous = meta.optDouble("chartPreviousClose", meta.optDouble("previousClose", Double.NaN))
+                    if (price.isFinite() && previous.isFinite() && previous != 0.0) {
+                        add(MarketIndexQuote(label, price, ((price - previous) / previous) * 100.0, ticker))
+                    }
+                } catch (_: Exception) {
+                    // Keep other indexes visible if one provider request fails.
+                } finally {
+                    connection?.disconnect()
+                }
+            }
+        }
+    }
+
     suspend fun loadMarketMovers(items: List<StockItem>) {
         if (items.isEmpty()) return
         moversLoading = true
@@ -164,6 +205,18 @@ private fun StockNewsWalaScreen() {
 
     LaunchedEffect(query, exchange) { loadStocks(query, exchange) }
     LaunchedEffect(stocks) { if (stocks.isNotEmpty()) loadMarketMovers(stocks) }
+    LaunchedEffect(tab) {
+        while (tab == "Home") {
+            indexesLoading = indexQuotes.isEmpty()
+            val fresh = loadIndexQuotes()
+            if (fresh.isNotEmpty()) {
+                indexQuotes = fresh
+                indexUpdatedAt = System.currentTimeMillis()
+            }
+            indexesLoading = false
+            delay(60_000)
+        }
+    }
 
     @Composable fun heading(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, color: Color = Blue, action: String = "सभी देखें") {
         Row(Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -228,21 +281,59 @@ private fun StockNewsWalaScreen() {
             } else if (tab == "Home") {
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
                     item {
-                        surfaceCard {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("NIFTY 50", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text("लाइव इंडेक्स", color = Muted, fontSize = 11.sp)
-                                    Text("भाव उपलब्ध होने पर दिखेगा", color = Blue, fontSize = 11.sp)
-                                }
-                                VerticalDivider(Modifier.height(62.dp), color = Color(0xFFDCE6F2))
-                                Spacer(Modifier.width(14.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text("SENSEX", color = Navy, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text("लाइव इंडेक्स", color = Muted, fontSize = 11.sp)
-                                    Text("भाव उपलब्ध होने पर दिखेगा", color = Blue, fontSize = 11.sp)
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Text("Market indices", color = Navy, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { scope.launch {
+                                    indexesLoading = true
+                                    val fresh = loadIndexQuotes()
+                                    if (fresh.isNotEmpty()) { indexQuotes = fresh; indexUpdatedAt = System.currentTimeMillis() }
+                                    indexesLoading = false
+                                } }) {
+                                    Icon(Icons.Default.Refresh, null, tint = Green, modifier = Modifier.size(15.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Refresh", color = Green, fontSize = 11.sp)
                                 }
                             }
+                            Row(
+                                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                listOf("NIFTY 50", "BANK NIFTY", "SENSEX").forEach { name ->
+                                    val item = indexQuotes.firstOrNull { it.name == name }
+                                    val positive = (item?.changePercent ?: 0.0) >= 0.0
+                                    Card(
+                                        modifier = Modifier.width(158.dp),
+                                        shape = RoundedCornerShape(15.dp),
+                                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                                        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                                    ) {
+                                        Column(Modifier.padding(horizontal = 13.dp, vertical = 12.dp)) {
+                                            Text(name, color = Navy, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                            Spacer(Modifier.height(8.dp))
+                                            if (item != null) {
+                                                Text("%,.2f".format(item.price), color = Navy, fontSize = 19.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                                Spacer(Modifier.height(4.dp))
+                                                Text(
+                                                    (if (positive) "+" else "") + "%.2f".format(item.changePercent) + "%",
+                                                    color = if (positive) Green else Red,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Text("Yahoo Finance quote", color = Muted, fontSize = 9.sp, maxLines = 1)
+                                            } else {
+                                                Text(if (indexesLoading) "लोड हो रहा है…" else "भाव उपलब्ध नहीं", color = Muted, fontSize = 12.sp)
+                                                Text("Refresh करके देखें", color = Blue, fontSize = 10.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            Text(
+                                if (indexUpdatedAt != null) "आखिरी अपडेट: " + java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(indexUpdatedAt!!)) + " • डेटा प्रदाता के अनुसार थोड़ा विलंब हो सकता है"
+                                else "इंडेक्स भाव बाहरी डेटा प्रदाता से लोड होंगे; बाजार बंद होने पर भाव नहीं बदलेंगे",
+                                color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp)
+                            )
                         }
                     }
                     item {
