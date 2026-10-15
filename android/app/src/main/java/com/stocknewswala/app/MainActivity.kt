@@ -2,6 +2,7 @@ package com.stocknewswala.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -81,6 +82,13 @@ private fun StockNewsWalaScreen() {
     var indexesLoading by remember { mutableStateOf(false) }
     var indexUpdatedAt by remember { mutableStateOf<Long?>(null) }
     var tab by remember { mutableStateOf("Home") }
+    var selectedSector by remember { mutableStateOf<String?>(null) }
+    BackHandler(enabled = selectedStock != null || tab != "Home") {
+        when {
+            selectedStock != null -> { selectedStock = null; quote = null; quoteError = null }
+            tab != "Home" -> { tab = "Home"; selectedSector = null }
+        }
+    }
     val scope = rememberCoroutineScope()
 
     suspend fun loadStocks(search: String, ex: String) {
@@ -138,7 +146,16 @@ private fun StockNewsWalaScreen() {
         val indexes = listOf(
             Triple("NIFTY 50", "%5ENSEI", "NIFTY 50"),
             Triple("BANK NIFTY", "%5ENSEBANK", "BANK NIFTY"),
-            Triple("SENSEX", "%5EBSESN", "SENSEX")
+            Triple("SENSEX", "%5EBSESN", "SENSEX"),
+            Triple("NIFTY NEXT 50", "%5ENSEMDCP50", "NIFTY NEXT 50"),
+            Triple("NIFTY 100", "%5ENSE100", "NIFTY 100"),
+            Triple("NIFTY 500", "%5ENSE500", "NIFTY 500"),
+            Triple("NIFTY MIDCAP 100", "%5ENSEMDCP", "NIFTY MIDCAP 100"),
+            Triple("NIFTY SMALLCAP 100", "%5ENSESMCP", "NIFTY SMALLCAP 100"),
+            Triple("NIFTY IT", "%5ECNXIT", "NIFTY IT"),
+            Triple("NIFTY FMCG", "%5ECNXFMCG", "NIFTY FMCG"),
+            Triple("NIFTY AUTO", "%5ECNXAUTO", "NIFTY AUTO"),
+            Triple("NIFTY PHARMA", "%5ECNXPHARMA", "NIFTY PHARMA")
         )
         buildList {
             indexes.forEach { (label, ticker, display) ->
@@ -301,7 +318,7 @@ private fun StockNewsWalaScreen() {
                                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                listOf("NIFTY 50", "BANK NIFTY", "SENSEX").forEach { name ->
+                                listOf("NIFTY 50", "BANK NIFTY", "SENSEX", "NIFTY NEXT 50", "NIFTY 100", "NIFTY 500", "NIFTY MIDCAP 100", "NIFTY SMALLCAP 100", "NIFTY IT", "NIFTY FMCG", "NIFTY AUTO", "NIFTY PHARMA").forEach { name ->
                                     val item = indexQuotes.firstOrNull { it.name == name }
                                     val positive = (item?.changePercent ?: 0.0) >= 0.0
                                     Card(
@@ -395,7 +412,7 @@ private fun StockNewsWalaScreen() {
                             listOf(listOf("Banking", "IT", "FMCG"), listOf("Pharma", "Auto", "Energy")).forEach { row ->
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     row.forEachIndexed { i, label ->
-                                        Surface(color = listOf(Color(0xFFE8FAF0), Color(0xFFEAF4FF), Color(0xFFFFF5E2))[i], shape = RoundedCornerShape(13.dp), modifier = Modifier.weight(1f).clickable { tab = "Screener" }) {
+                                        Surface(color = listOf(Color(0xFFE8FAF0), Color(0xFFEAF4FF), Color(0xFFFFF5E2))[i], shape = RoundedCornerShape(13.dp), modifier = Modifier.weight(1f).clickable { selectedSector = label; tab = "Screener" }) {
                                             Column(Modifier.padding(11.dp)) {
                                                 Text(label, color = Navy, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                                 Text("शेयर देखें  ›", color = Muted, fontSize = 10.sp)
@@ -425,7 +442,10 @@ private fun StockNewsWalaScreen() {
             } else {
                 Column(Modifier.weight(1f).padding(horizontal = 16.dp)) {
                     Spacer(Modifier.height(8.dp))
-                    Text(when (tab) { "Stocks" -> "सभी शेयर"; "Screener" -> "स्टॉक स्क्रीनर"; "News" -> "मार्केट न्यूज़"; else -> "एडमिन" }, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Navy)
+                    Text(when (tab) { "Stocks" -> "सभी शेयर"; "Screener" -> if (selectedSector != null) "$selectedSector सेक्टर के शेयर" else "स्टॉक स्क्रीनर"; "News" -> "मार्केट न्यूज़"; else -> "एडमिन" }, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Navy)
+                    if (tab == "Screener" && selectedSector != null) {
+                        TextButton(onClick = { selectedSector = null }) { Text("सभी सेक्टर दिखाएँ") }
+                    }
                     Spacer(Modifier.height(10.dp))
                     if (tab == "Paper Trading") {
                         PaperTradingScreen(
@@ -461,7 +481,21 @@ private fun StockNewsWalaScreen() {
                         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
                         if (error != null) Text(error!!, color = Red)
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.weight(1f)) {
-                            items(stocks, key = { it.exchange + ":" + it.tradingSymbol }) { s ->
+                            items(
+                                if (tab == "Screener" && selectedSector != null) stocks.filter { stock ->
+                                    val h = (stock.symbol + " " + stock.name).uppercase()
+                                    when (selectedSector) {
+                                        "Banking" -> listOf("BANK", "HDFC", "ICICI", "KOTAK", "AXIS", "SBI", "INDUSIND", "FEDERAL").any { it in h }
+                                        "IT" -> listOf("TECH", "TCS", "INFY", "WIPRO", "HCL", "LTIM", "PERSISTENT", "COFORGE", "MPHASIS").any { it in h }
+                                        "FMCG" -> listOf("HINDUNIL", "ITC", "NESTLE", "BRITANNIA", "DABUR", "MARICO", "GODREJ CONSUMER", "COLPAL", "TATACONSUM").any { it in h }
+                                        "Pharma" -> listOf("PHARMA", "SUNPHARMA", "CIPLA", "DRREDDY", "LUPIN", "AUROBINDO", "ZYDUS", "BIOCON", "TORRENT").any { it in h }
+                                        "Auto" -> listOf("MARUTI", "TATAMOTORS", "EICHER", "BAJAJ-AUTO", "HEROMOTO", "ASHOKLEY", "TVSMOTOR").any { it in h }
+                                        "Energy" -> listOf("RELIANCE", "ONGC", "NTPC", "POWERGRID", "ADANIGREEN", "TATAPOWER", "IOC", "BPCL", "GAIL").any { it in h }
+                                        else -> true
+                                    }
+                                } else stocks,
+                                key = { it.exchange + ":" + it.tradingSymbol }
+                            ) { s ->
                                 Surface(color = Color.White, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().clickable { selectedStock = s; scope.launch { loadQuote(s) } }) {
                                     Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Column(Modifier.weight(1f)) { Text(s.symbol, fontWeight = FontWeight.Bold, color = Navy); Text(s.name, color = Muted, fontSize = 12.sp) }
