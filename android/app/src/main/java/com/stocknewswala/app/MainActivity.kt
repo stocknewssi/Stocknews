@@ -214,7 +214,8 @@ private fun StockNewsWalaScreen() {
                 indexUpdatedAt = System.currentTimeMillis()
             }
             indexesLoading = false
-            delay(60_000)
+            // Poll at a reasonable interval; the upstream quote provider controls actual update frequency.
+            delay(5_000)
         }
     }
 
