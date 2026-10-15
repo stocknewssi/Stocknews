@@ -95,7 +95,7 @@ private fun StockNewsWalaScreen() {
         loading = true; error = null
         try {
             stocks = withContext(Dispatchers.IO) {
-                val url = URL(BuildConfig.API_BASE_URL + "api/stocks?q=" + URLEncoder.encode(search, "UTF-8") + "&exchange=" + ex + "&limit=50")
+                val url = URL(BuildConfig.API_BASE_URL + "api/stocks?q=" + URLEncoder.encode(search, "UTF-8") + "&exchange=" + ex + "&limit=5000")
                 val c = url.openConnection() as HttpURLConnection
                 c.connectTimeout = 12000; c.readTimeout = 12000
                 try {
