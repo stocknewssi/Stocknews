@@ -27,3 +27,37 @@ nav a:hover,nav a:focus-visible{background:#eaf1ff;color:#155eef;outline:none}
 .sn-pro-note{font-size:.82rem;color:#68758a;line-height:1.5}
 @media(max-width:900px){.sn-pro-grid>*{grid-column:span 6}}
 @media(max-width:600px){header{padding:10px 12px}nav{gap:4px}nav a{padding:8px;font-size:.82rem}#app{padding:12px}.sn-pro-grid>*{grid-column:1/-1}#app th,#app td{padding:9px 8px;font-size:.85rem}}
+
+
+/* StockPal light professional dashboard refresh */
+:root{color-scheme:light;--sp-ink:#172033;--sp-muted:#68758a;--sp-line:#e2e8f0;--sp-panel:#fff;--sp-canvas:#f4f7fb}
+body{background:#f4f7fb!important;color:var(--sp-ink)!important}
+header{background:rgba(255,255,255,.94)!important;border-bottom:1px solid #e3eaf4!important;box-shadow:0 4px 18px rgba(23,32,51,.05)!important}
+header>a{color:#172033!important}
+nav a{color:#526078!important}
+nav a.active{background:#eaf1ff!important;color:#155eef!important;box-shadow:none!important}
+#app{max-width:1440px!important;padding:clamp(14px,2.5vw,34px)!important}
+#app .hero{background:linear-gradient(120deg,#fff,#eef4ff)!important;border:1px solid #e0e8f5!important;box-shadow:0 12px 36px rgba(23,32,51,.06)!important}
+#app .hero p{color:#68758a!important}
+#app .hero h1{color:#172033}
+#app .hero h1 span{background:linear-gradient(90deg,#155eef,#6d5ce8);-webkit-background-clip:text;background-clip:text;color:transparent}
+#app .hero-chart{background-color:#fff!important;border-color:#e2e8f0!important}
+#app .panel,#app .summary-card,#app .index-card,#app .stock-card,#app .sector-card,#app .directory-table-card,#app .admin-card,#app .news-card,#app .detail-stat,#app .stock-detail-hero{background:#fff!important;border-color:#e2e8f0!important;color:#172033!important;box-shadow:0 5px 22px rgba(23,32,51,.04)}
+#app .stock-card:hover,#app .sector-card:hover{box-shadow:0 12px 28px rgba(23,32,51,.08)}
+#app .muted,#app .stock-name span,#app .sector-card strong small{color:#68758a!important}
+#app .stock-table th,#app .directory-table th{background:#f6f8fc!important;color:#68758a!important}
+#app .stock-table td,#app .directory-table td{border-color:#e8edf5!important}
+#app .directory-toolbar{background:#fff!important;border:1px solid #e2e8f0!important;border-radius:16px;padding:14px!important;box-shadow:0 5px 22px rgba(23,32,51,.04)}
+#app .directory-search input{background:#fff!important;color:#172033!important;border-color:#d9e2ef!important}
+#app .directory-search{background:#fff!important;border-color:#d9e2ef!important}
+#app .directory-table-card{border:1px solid #e2e8f0!important;border-radius:16px;overflow:hidden}
+#app .directory-pagination button,#app .directory-refresh{background:#eef4ff!important;color:#155eef!important;border:1px solid #d7e4ff!important;padding:10px 14px!important}
+#app .directory-pagination button:disabled{opacity:.45}
+#app .directory-message{background:#f8faff!important;color:#172033!important}
+#app .directory-error{background:#fff5f5!important}
+#app .status-card{background:#fff!important;border-color:#e2e8f0!important;color:#172033!important}
+#app .secondary-btn{background:#fff!important;color:#155eef!important;border-color:#d9e2ef!important}
+#app input:focus,#app select:focus,#app button:focus-visible{outline:3px solid rgba(21,94,239,.18);outline-offset:1px}
+#app .directory-company small{color:#68758a!important}
+#app .stock-detail-page .chart-placeholder{background:#fff!important;border:1px solid #e2e8f0!important;color:#172033!important}
+@media(max-width:640px){header{align-items:flex-start!important;flex-direction:column!important;gap:8px!important}nav{max-width:100%;width:100%;flex-wrap:nowrap!important}#app .hero{grid-template-columns:1fr!important;padding:24px!important}#app .hero-visual{min-height:150px}#app .directory-toolbar{align-items:stretch;flex-direction:column}#app .directory-search{width:100%}#app .directory-table-scroll{overflow-x:auto}}
