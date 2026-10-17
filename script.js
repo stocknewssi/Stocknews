@@ -626,9 +626,12 @@ function home() {
         </div>
 
         <div class="hero-visual">
-          <div class="hero-chart">
-            <div class="chart-line"></div>
-            <span>LIVE</span>
+          <div class="home-chart-panel" style="width:100%;min-width:0;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:14px;box-shadow:0 12px 32px rgba(15,23,42,.08)">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
+              <div><small style="display:block;color:#64748b">RELIANCE · NSE</small><strong style="color:#0f172a">Price trend</strong></div>
+              <span style="font-size:12px;color:#64748b" id="homeChartStatus">Loading market candles…</span>
+            </div>
+            <div id="homeCandleChart" style="width:100%;height:220px"></div>
           </div>
         </div>
 
@@ -803,6 +806,70 @@ function home() {
 
     </div>
   `;
+}
+
+/* =========================================================
+   HOME PAGE — REAL HISTORICAL CANDLE CHART
+   ========================================================= */
+
+async function setupHomeChart() {
+  const host = document.getElementById("homeCandleChart");
+  const status = document.getElementById("homeChartStatus");
+  if (!host || !status) return;
+  if (!window.LightweightCharts) {
+    status.textContent = "Chart library unavailable";
+    return;
+  }
+  if (host._homeChart) {
+    try { host._homeChart.remove(); } catch (_) {}
+  }
+  const chart = window.LightweightCharts.createChart(host, {
+    width: host.clientWidth || 420,
+    height: 220,
+    layout: { background: { color: "#ffffff" }, textColor: "#475569" },
+    grid: { vertLines: { color: "#f1f5f9" }, horzLines: { color: "#f1f5f9" } },
+    rightPriceScale: { borderColor: "#e2e8f0" },
+    timeScale: { borderColor: "#e2e8f0", timeVisible: false },
+    crosshair: { mode: 0 }
+  });
+  host._homeChart = chart;
+  const series = chart.addCandlestickSeries({
+    upColor: "#16a34a", downColor: "#dc2626",
+    borderUpColor: "#16a34a", borderDownColor: "#dc2626",
+    wickUpColor: "#16a34a", wickDownColor: "#dc2626"
+  });
+  try {
+    const params = new URLSearchParams({ symbol: "RELIANCE", exchange: "NSE", interval: "ONE_DAY" });
+    const response = await fetch("/api/candles?" + params.toString(), { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok || !data.success || !Array.isArray(data.candles)) {
+      throw new Error(data.error || "Historical candles unavailable");
+    }
+    const points = data.candles.map(row => {
+      const raw = String(row[0] || "");
+      let date = new Date(raw);
+      if (Number.isNaN(date.getTime())) {
+        const match = raw.match(/^(\d{2})-(\d{2})-(\d{4})/);
+        if (match) date = new Date(Number(match[3]), Number(match[2]) - 1, Number(match[1]));
+      }
+      const open = Number(row[1]), high = Number(row[2]), low = Number(row[3]), close = Number(row[4]);
+      if (Number.isNaN(date.getTime()) || ![open, high, low, close].every(Number.isFinite)) return null;
+      return { time: { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() }, open, high, low, close };
+    }).filter(Boolean).sort((a, b) => a.time.year - b.time.year || a.time.month - b.time.month || a.time.day - b.time.day);
+    if (!points.length) throw new Error("No historical candles returned");
+    series.setData(points);
+    chart.timeScale().fitContent();
+    status.textContent = points.length + " daily candles";
+  } catch (error) {
+    status.textContent = "Chart unavailable: " + (error.message || "data error");
+  }
+  if (window.ResizeObserver) {
+    const observer = new ResizeObserver(() => {
+      if (host._homeChart === chart) chart.applyOptions({ width: host.clientWidth || 420 });
+    });
+    observer.observe(host);
+    host._homeChartObserver = observer;
+  }
 }
 
 /* =========================================================
@@ -1815,6 +1882,10 @@ function renderCurrentPage() {
   }
 
   app.innerHTML = html;
+
+  if (page === "home") {
+    setupHomeChart();
+  }
 
   if (page === "screener") {
     setupScreener();
