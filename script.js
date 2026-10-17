@@ -881,82 +881,25 @@ function newsPage() {
 function screener() {
   return `
     <div class="page-header">
-
       <div>
         <span class="eyebrow">ANALYSIS TOOL</span>
         <h1>Stock Screener</h1>
-        <p class="muted">
-          Search by symbol or company, then filter by performance, sector and market-cap category.
-        </p>
+        <p class="muted">Search the exchange directory by company or symbol. Quote availability depends on the market-data provider.</p>
       </div>
-
     </div>
-
-    <div class="screener-toolbar">
-
-      <div class="search-box">
-
-        <span>⌕</span>
-
-        <input
-          id="q"
-          type="search"
-          placeholder="Search stock, company or sector..."
-          autocomplete="off"
-        >
-
-      </div>
-
-      <div class="screener-selects">
-        <select id="sectorFilter" aria-label="Filter by sector">
-          <option value="">All sectors</option>
-          <option value="Energy">Energy</option><option value="IT">IT</option><option value="Banking">Banking</option><option value="FMCG">FMCG</option><option value="Other">Other</option>
-        </select>
-        <select id="capFilter" aria-label="Filter by market capitalization">
-          <option value="">All market caps</option><option value="Large Cap">Large Cap</option><option value="Mid Cap">Mid Cap</option><option value="Small Cap">Small Cap</option><option value="Unclassified">Unclassified</option>
-        </select>
-      </div>
-
-      <div class="filter-buttons">
-
-        <button
-          type="button"
-          class="filter-btn active"
-          id="allFilter"
-        >
-          All
-        </button>
-
-        <button
-          type="button"
-          class="filter-btn"
-          id="gainersFilter"
-        >
-          🟢 Gainers
-        </button>
-
-        <button
-          type="button"
-          class="filter-btn"
-          id="losersFilter"
-        >
-          🔴 Losers
-        </button>
-
-      </div>
-
-    </div>
-
-    <div class="section-block">
-
-      <p id="screenerCount" class="muted" aria-live="polite"></p>
-      <div id="t">
-        ${tbl()}
-      </div>
-
-    </div>
-
-    ${marketStatus()}
+    <section class="directory-toolbar">
+      <label class="directory-search"><span>⌕</span><input id="screenSearch" type="search" placeholder="Search all available NSE/BSE stocks…" autocomplete="off"></label>
+      <select id="screenExchange" aria-label="Exchange">
+        <option value="">NSE + BSE</option><option value="NSE">NSE</option><option value="BSE">BSE</option>
+      </select>
+      <button class="directory-refresh" id="screenSearchButton" type="button">Search</button>
+    </section>
+    <section class="directory-table-card">
+      <div class="directory-table-head"><div><h2>Search results</h2><p id="screenCount" aria-live="polite">Enter a symbol or company name to search the exchange directory.</p></div></div>
+      <div id="screenResults"><div class="directory-message"><strong>Search the stock directory</strong><small>Search results come from the server-side exchange instrument list, not the seven-stock homepage watchlist.</small></div></div>
+      <div class="directory-pagination"><span id="screenPageLabel">No search performed</span><div><button type="button" id="screenPrev" disabled>← Previous</button><button type="button" id="screenNext" disabled>Next →</button></div></div>
+      <p class="directory-disclaimer">Search results do not imply that a live quote is available. Prices are not estimated or fabricated.</p>
+    </section>
   `;
 }
 
@@ -1482,94 +1425,75 @@ async function checkAdmin() {
    ========================================================= */
 
 function setupScreener() {
-  const search = document.getElementById("q");
-  const table = document.getElementById("t");
+  const search = document.getElementById("screenSearch");
+  const exchange = document.getElementById("screenExchange");
+  const button = document.getElementById("screenSearchButton");
+  const target = document.getElementById("screenResults");
+  const count = document.getElementById("screenCount");
+  const pageLabel = document.getElementById("screenPageLabel");
+  const prev = document.getElementById("screenPrev");
+  const next = document.getElementById("screenNext");
+  if (!search || !target) return;
 
-  const allBtn = document.getElementById("allFilter");
-  const gainersBtn = document.getElementById("gainersFilter");
-  const losersBtn = document.getElementById("losersFilter");
-  const sectorFilter = document.getElementById("sectorFilter");
-  const capFilter = document.getElementById("capFilter");
-  const count = document.getElementById("screenerCount");
+  const state = { query: "", exchange: "", offset: 0, limit: 50, total: 0, requestId: 0 };
+  let debounce;
 
-  if (!search || !table) return;
-
-  let mode = "all";
-
-  const buttons = [
-    allBtn,
-    gainersBtn,
-    losersBtn
-  ].filter(Boolean);
-
-  function setActive(button) {
-    buttons.forEach(btn =>
-      btn.classList.remove("active")
-    );
-
-    if (button) {
-      button.classList.add("active");
+  async function runSearch() {
+    const requestId = ++state.requestId;
+    state.query = search.value.trim();
+    state.exchange = exchange.value;
+    if (!state.query) {
+      target.innerHTML = '<div class="directory-message"><strong>Enter a search term</strong><small>Try a company name such as Tata or a symbol such as RELIANCE.</small></div>';
+      if (count) count.textContent = "Enter a symbol or company name.";
+      if (pageLabel) pageLabel.textContent = "No search performed";
+      if (prev) prev.disabled = true;
+      if (next) next.disabled = true;
+      return;
+    }
+    target.innerHTML = directoryLoadingMarkup();
+    if (count) count.textContent = "Searching exchange directory…";
+    try {
+      const params = new URLSearchParams({ q: state.query, exchange: state.exchange, limit: String(state.limit), offset: String(state.offset) });
+      const response = await fetch("/api/stocks?" + params.toString(), { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok || !data.success || !Array.isArray(data.stocks)) throw new Error(data.error || "Stock search failed");
+      if (requestId !== state.requestId) return;
+      state.total = Number(data.total) || 0;
+      const rows = data.stocks;
+      target.innerHTML = directoryRowsMarkup(rows);
+      if (count) count.textContent = number(state.total) + " matching stocks in " + (state.exchange || "NSE + BSE") + " directory";
+      const first = state.total ? state.offset + 1 : 0;
+      const last = Math.min(state.offset + rows.length, state.total);
+      if (pageLabel) pageLabel.textContent = state.total ? "Showing " + first + "–" + last + " of " + number(state.total) : "No matching stocks";
+      if (prev) prev.disabled = state.offset <= 0;
+      if (next) next.disabled = state.offset + state.limit >= state.total;
+      const symbols = rows.map(row => String(row.symbol) + "." + String(row.exchange));
+      if (symbols.length) {
+        try {
+          const quoteResponse = await fetch("/api/market?symbols=" + encodeURIComponent(symbols.slice(0,50).join(",")), { cache: "no-store" });
+          const quoteData = await quoteResponse.json();
+          if (requestId === state.requestId && quoteResponse.ok && quoteData.success && Array.isArray(quoteData.prices)) {
+            const quotes = new Map(quoteData.prices.map(p => [String(p.symbol).toUpperCase()+"."+String(p.exchange).toUpperCase(),p]));
+            target.innerHTML = directoryRowsMarkup(rows.map(row => Object.assign({},row,quotes.get(String(row.symbol).toUpperCase()+"."+String(row.exchange).toUpperCase()) || {})));
+          }
+        } catch (_) { /* Keep search results visible even if live quotes are unavailable. */ }
+      }
+    } catch (error) {
+      if (requestId !== state.requestId) return;
+      target.innerHTML = '<div class="directory-message directory-error"><strong>Stock search unavailable</strong><small>' + esc(error.message || "Please try again.") + '</small></div>';
+      if (count) count.textContent = "Could not load exchange search results.";
     }
   }
 
-  function render() {
-    const query = search.value.trim().toLowerCase();
-
-    let result = stocks.filter(stock => {
-      const text =
-        `${stock[0]} ${stock[1]} ${sectorOf(stock)} ${capOf(stock)}`
-          .toLowerCase();
-      const matchesQuery = text.includes(query);
-      const matchesSector = !sectorFilter?.value || sectorOf(stock) === sectorFilter.value;
-      const matchesCap = !capFilter?.value || capOf(stock) === capFilter.value;
-      return matchesQuery && matchesSector && matchesCap;
-    });
-
-    if (mode === "gainers") {
-      result = result.filter(
-        stock => Number(stock[3]) > 0
-      );
-    }
-
-    if (mode === "losers") {
-      result = result.filter(
-        stock => Number(stock[3]) < 0
-      );
-    }
-
-    table.innerHTML = tbl(result);
-    if (count) count.textContent = `Showing ${result.length} of ${stocks.length} stocks in the current watchlist`;
-  }
-
-  search.addEventListener("input", render);
-  sectorFilter?.addEventListener("change", render);
-  capFilter?.addEventListener("change", render);
-
-  if (allBtn) {
-    allBtn.addEventListener("click", () => {
-      mode = "all";
-      setActive(allBtn);
-      render();
-    });
-  }
-
-  if (gainersBtn) {
-    gainersBtn.addEventListener("click", () => {
-      mode = "gainers";
-      setActive(gainersBtn);
-      render();
-    });
-  }
-
-  if (losersBtn) {
-    losersBtn.addEventListener("click", () => {
-      mode = "losers";
-      setActive(losersBtn);
-      render();
-    });
-  }
+  search.addEventListener("input", () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => { state.offset = 0; runSearch(); }, 250);
+  });
+  exchange.addEventListener("change", () => { state.offset = 0; runSearch(); });
+  button.addEventListener("click", () => { state.offset = 0; runSearch(); });
+  prev.addEventListener("click", () => { state.offset = Math.max(0, state.offset-state.limit); runSearch(); });
+  next.addEventListener("click", () => { if (state.offset+state.limit < state.total) { state.offset += state.limit; runSearch(); } });
 }
-
 /* =========================================================
    ADMIN EVENTS
    ========================================================= */
