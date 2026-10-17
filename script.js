@@ -1442,14 +1442,6 @@ function setupScreener() {
     const requestId = ++state.requestId;
     state.query = search.value.trim();
     state.exchange = exchange.value;
-    if (!state.query) {
-      target.innerHTML = '<div class="directory-message"><strong>Enter a search term</strong><small>Try a company name such as Tata or a symbol such as RELIANCE.</small></div>';
-      if (count) count.textContent = "Enter a symbol or company name.";
-      if (pageLabel) pageLabel.textContent = "No search performed";
-      if (prev) prev.disabled = true;
-      if (next) next.disabled = true;
-      return;
-    }
     target.innerHTML = directoryLoadingMarkup();
     if (count) count.textContent = "Searching exchange directory…";
     try {
@@ -1461,7 +1453,7 @@ function setupScreener() {
       state.total = Number(data.total) || 0;
       const rows = data.stocks;
       target.innerHTML = directoryRowsMarkup(rows);
-      if (count) count.textContent = number(state.total) + " matching stocks in " + (state.exchange || "NSE + BSE") + " directory";
+      if (count) count.textContent = number(state.total) + (state.query ? " matching stocks" : " stocks") + " in " + (state.exchange || "NSE + BSE") + " directory";
       const first = state.total ? state.offset + 1 : 0;
       const last = Math.min(state.offset + rows.length, state.total);
       if (pageLabel) pageLabel.textContent = state.total ? "Showing " + first + "–" + last + " of " + number(state.total) : "No matching stocks";
