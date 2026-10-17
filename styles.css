@@ -444,3 +444,27 @@ p{
 #screenerCount{margin:16px 0 8px}
 @media(max-width:900px){.sector-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.sector-grid{grid-template-columns:1fr 1fr;gap:9px}.sector-card{padding:12px;min-height:130px}.screener-selects{width:100%}.screener-selects select{flex:1;min-width:130px}}
+
+
+/* Homepage market-intelligence redesign */
+.home-pro-hero{background:linear-gradient(120deg,#f8fbff 0%,#edf5ff 52%,#f0fdfa 100%);border:1px solid #dbeafe;border-radius:24px;padding:clamp(22px,4vw,42px);gap:28px}
+.home-pro-hero .hero-content{max-width:560px}
+.home-pro-hero h1{letter-spacing:-.04em;line-height:1.06}
+.home-pro-hero h1 span{color:#2563eb}
+.home-trust-points{display:flex;gap:10px 16px;flex-wrap:wrap;margin-top:22px;color:#475569;font-size:12px}
+.home-market-overview{margin:28px 0}
+.home-pulse-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.home-pulse-card{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px;display:flex;flex-direction:column;gap:8px;box-shadow:0 5px 18px rgba(15,23,42,.035)}
+.home-pulse-card span,.home-pulse-card small{font-size:12px;color:#64748b}
+.home-pulse-card strong{font-size:clamp(20px,2vw,29px);color:#0f172a;letter-spacing:-.03em;overflow-wrap:anywhere}
+.home-discovery-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.home-discovery-card{display:flex;flex-direction:column;gap:10px;padding:20px;min-height:170px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;text-decoration:none;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.home-discovery-card:hover{transform:translateY(-3px);box-shadow:0 12px 28px rgba(15,23,42,.08);border-color:#93c5fd}
+.home-discovery-card>span{font-size:12px;color:#2563eb;font-weight:800;letter-spacing:.1em}
+.home-discovery-card strong{color:#0f172a;font-size:17px}
+.home-discovery-card small{color:#64748b;line-height:1.5}
+.home-discovery-card b{margin-top:auto;color:#2563eb;font-size:13px}
+.home-movers-block .two-column{margin-top:14px}
+.home-pro .section-heading{gap:14px}
+@media(max-width:900px){.home-pulse-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-discovery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.home-pro-hero{padding:20px;border-radius:18px}.home-trust-points{display:grid;gap:8px}.home-pulse-grid{gap:9px}.home-pulse-card{padding:14px}.home-discovery-grid{gap:9px}.home-discovery-card{padding:15px;min-height:160px}.home-pro .section-heading{align-items:flex-start;flex-direction:column}}

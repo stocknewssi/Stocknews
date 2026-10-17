@@ -578,234 +578,96 @@ function marketSummary() {
    ========================================================= */
 
 function home() {
-  const sorted = stocks
-    .slice()
-    .sort((a, b) => Number(b[3]) - Number(a[3]));
-
-  const topGainers = stocks
-    .filter(x => Number(x[3]) > 0)
-    .sort((a, b) => Number(b[3]) - Number(a[3]))
-    .slice(0, 4);
-
-  const topLosers = stocks
-    .filter(x => Number(x[3]) < 0)
-    .sort((a, b) => Number(a[3]) - Number(b[3]))
-    .slice(0, 4);
-
   return `
-    <div class="dashboard-page">
-
-      <section class="hero">
-
+    <div class="dashboard-page home-pro">
+      <section class="hero home-pro-hero">
         <div class="hero-content">
-
-          <span class="hero-badge">
-            ● LIVE MARKET
-          </span>
-
-          <h1>
-            Indian Stock Market
-            <span>Dashboard</span>
-          </h1>
-
-          <p>
-            Track Indian stocks, market movers, latest news
-            and live Angel One market data in one place.
-          </p>
-
+          <span class="hero-badge">● MARKET INTELLIGENCE</span>
+          <h1>Indian Markets,<br><span>One Clear View.</span></h1>
+          <p>Explore exchange-wide stocks, discover market movers and study real price history in one clean dashboard.</p>
           <div class="hero-actions">
-            <a href="#/stocks" class="primary-btn">
-              Explore Stocks →
-            </a>
-
-            <a href="#/screener" class="secondary-btn">
-              Open Screener
-            </a>
+            <a href="#/stocks" class="primary-btn">Explore all stocks →</a>
+            <a href="#/screener" class="secondary-btn">Build a screen</a>
           </div>
-
+          <div class="home-trust-points"><span>✓ NSE + BSE directory</span><span>✓ Historical candles</span><span>✓ No invented quotes</span></div>
         </div>
-
         <div class="hero-visual">
-          <div class="home-chart-panel" style="width:100%;min-width:0;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:14px;box-shadow:0 12px 32px rgba(15,23,42,.08)">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px">
-              <div><small style="display:block;color:#64748b">RELIANCE · NSE</small><strong style="color:#0f172a">Price trend</strong></div>
-              <span style="font-size:12px;color:#64748b" id="homeChartStatus">Loading market candles…</span>
+          <div class="home-chart-panel" style="width:100%;min-width:0;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:16px;box-shadow:0 16px 40px rgba(15,23,42,.10)">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px">
+              <div><small style="display:block;color:#64748b">RELIANCE · NSE</small><strong style="color:#0f172a">Historical price action</strong></div>
+              <span style="font-size:12px;color:#64748b" id="homeChartStatus">Loading candles…</span>
             </div>
-            <div id="homeCandleChart" style="width:100%;height:220px"></div>
+            <div id="homeCandleChart" style="width:100%;height:250px"></div>
           </div>
         </div>
-
       </section>
-
-      ${marketSummary()}
-
-      ${sectorOverview()}
-
-      <section class="market-index-grid">
-
-        <div class="index-card">
-          <div>
-            <small>NIFTY 50</small>
-            <strong>—</strong>
-          </div>
-          <span class="index-placeholder">LIVE</span>
+      <section class="home-market-overview">
+        <div class="section-heading"><div><span class="eyebrow">MARKET PULSE</span><h2>Exchange-wide snapshot</h2></div><span class="muted" id="homeDirectoryStatus">Loading exchange data…</span></div>
+        <div class="home-pulse-grid">
+          <article class="home-pulse-card"><span>Stocks in directory</span><strong id="homeTotalStocks">—</strong><small>NSE / BSE instruments</small></article>
+          <article class="home-pulse-card"><span>Quotes available</span><strong id="homeQuoteCount">—</strong><small>On this snapshot</small></article>
+          <article class="home-pulse-card"><span>Top mover</span><strong id="homeTopMover">—</strong><small id="homeTopMoverChange">Waiting for quotes</small></article>
+          <article class="home-pulse-card"><span>Market feed</span><strong id="homeFeedState">Checking</strong><small id="homeFeedTime">Live availability depends on provider</small></article>
         </div>
-
-        <div class="index-card">
-          <div>
-            <small>SENSEX</small>
-            <strong>—</strong>
-          </div>
-          <span class="index-placeholder">LIVE</span>
-        </div>
-
-        <div class="index-card">
-          <div>
-            <small>BANK NIFTY</small>
-            <strong>—</strong>
-          </div>
-          <span class="index-placeholder">LIVE</span>
-        </div>
-
-        <div class="index-card">
-          <div>
-            <small>INDIA VIX</small>
-            <strong>—</strong>
-          </div>
-          <span class="index-placeholder">LIVE</span>
-        </div>
-
       </section>
-
-      <section class="section-block">
-
-        <div class="section-heading">
-          <div>
-            <span class="eyebrow">MARKET WATCH</span>
-            <h2>Top Movers</h2>
-          </div>
-
-          <a href="#/stocks" class="section-link">
-            View all →
-          </a>
+      <section class="section-block home-movers-block">
+        <div class="section-heading"><div><span class="eyebrow">DISCOVER</span><h2>Market movers</h2><p class="muted">Based on available quotes from the exchange directory—not a fixed seven-stock watchlist.</p></div><a href="#/stocks" class="section-link">Open full directory →</a></div>
+        <div class="two-column">
+          <div class="panel"><div class="section-heading"><div><span class="eyebrow green-text">TOP GAINERS</span><h2>Moving up</h2></div></div><div class="compact-list" id="homeDirectoryGainers"><p class="muted">Loading quote data…</p></div></div>
+          <div class="panel"><div class="section-heading"><div><span class="eyebrow red-text">TOP LOSERS</span><h2>Moving down</h2></div></div><div class="compact-list" id="homeDirectoryLosers"><p class="muted">Loading quote data…</p></div></div>
         </div>
-
-        <div class="stock-card-grid">
-          ${
-            sorted
-              .slice(0, 6)
-              .map(stockCard)
-              .join("")
-          }
-        </div>
-
       </section>
-
-      <section class="two-column">
-
-        <div class="panel">
-
-          <div class="section-heading">
-            <div>
-              <span class="eyebrow green-text">TOP GAINERS</span>
-              <h2>Leading Stocks</h2>
-            </div>
-          </div>
-
-          <div class="compact-list">
-            ${
-              topGainers.length
-                ? topGainers.map(stock => `
-                    <a
-                      class="compact-stock"
-                      href="#/stock/${encodeURIComponent(stock[0])}"
-                    >
-                      <span class="compact-logo">
-                        ${esc(stockLogo(stock[0]))}
-                      </span>
-
-                      <span class="compact-info">
-                        <strong>${esc(stock[0])}</strong>
-                        <small>${esc(stock[1])}</small>
-                      </span>
-
-                      <span class="compact-price">
-                        ${money(stock[2])}
-                        <b class="up">
-                          ${percent(stock[3])}
-                        </b>
-                      </span>
-                    </a>
-                  `).join("")
-                : `<p class="muted">No gainers.</p>`
-            }
-          </div>
-
-        </div>
-
-        <div class="panel">
-
-          <div class="section-heading">
-            <div>
-              <span class="eyebrow red-text">TOP LOSERS</span>
-              <h2>Under Pressure</h2>
-            </div>
-          </div>
-
-          <div class="compact-list">
-            ${
-              topLosers.length
-                ? topLosers.map(stock => `
-                    <a
-                      class="compact-stock"
-                      href="#/stock/${encodeURIComponent(stock[0])}"
-                    >
-                      <span class="compact-logo">
-                        ${esc(stockLogo(stock[0]))}
-                      </span>
-
-                      <span class="compact-info">
-                        <strong>${esc(stock[0])}</strong>
-                        <small>${esc(stock[1])}</small>
-                      </span>
-
-                      <span class="compact-price">
-                        ${money(stock[2])}
-                        <b class="down">
-                          ${percent(stock[3])}
-                        </b>
-                      </span>
-                    </a>
-                  `).join("")
-                : `<p class="muted">No losers.</p>`
-            }
-          </div>
-
-        </div>
-
-      </section>
-
-      <section class="section-block">
-
-        <div class="section-heading">
-          <div>
-            <span class="eyebrow">STOCK MARKET</span>
-            <h2>All Stocks</h2>
-          </div>
-
-          <a href="#/screener" class="section-link">
-            Screen stocks →
-          </a>
-        </div>
-
-        ${tbl(stocks)}
-
-      </section>
-
+      <section class="section-block"><div class="section-heading"><div><span class="eyebrow">FIND YOUR NEXT IDEA</span><h2>Explore by market segment</h2><p class="muted">Jump into the complete searchable directory and filter by exchange or company.</p></div></div><div class="home-discovery-grid"><a href="#/stocks" class="home-discovery-card"><span>01</span><strong>All listed stocks</strong><small>Search NSE and BSE symbols</small><b>Explore →</b></a><a href="#/screener" class="home-discovery-card"><span>02</span><strong>Stock screener</strong><small>Find companies by name or symbol</small><b>Screen →</b></a><a href="#/stock/RELIANCE.NSE" class="home-discovery-card"><span>03</span><strong>Technical charts</strong><small>Inspect historical candles and timeframes</small><b>View chart →</b></a><a href="#/news" class="home-discovery-card"><span>04</span><strong>Market newsroom</strong><small>Read the latest available updates</small><b>Read news →</b></a></div></section>
       ${marketStatus()}
+    </div>`;
+}
 
-    </div>
-  `;
+async function setupHomeDirectory() {
+  const status = document.getElementById("homeDirectoryStatus");
+  const showMessage = (id, message) => { const el = document.getElementById(id); if (el) el.innerHTML = message; };
+  try {
+    const response = await fetch("/api/stocks?exchange=NSE&limit=50&offset=0", {cache:"no-store"});
+    const data = await response.json();
+    if (!response.ok || !data.success || !Array.isArray(data.stocks)) throw new Error(data.error || "Exchange directory unavailable");
+    const rows = data.stocks;
+    const total = document.getElementById("homeTotalStocks");
+    if (total) total.textContent = Number(data.total || 0).toLocaleString("en-IN");
+    if (status) status.textContent = "NSE directory loaded · quotes updating…";
+    if (!rows.length) throw new Error("No exchange instruments returned");
+    const symbols = rows.map(row => String(row.symbol) + "." + String(row.exchange || "NSE"));
+    const quoteResponse = await fetch("/api/market?symbols=" + encodeURIComponent(symbols.join(",")), {cache:"no-store"});
+    const quoteData = await quoteResponse.json();
+    if (!quoteResponse.ok || !quoteData.success || !Array.isArray(quoteData.prices)) throw new Error(quoteData.error || "Live quotes unavailable");
+    const quoteMap = new Map(quoteData.prices.map(q => [String(q.symbol).replace(/-EQ$/i,"").toUpperCase(),q]));
+    const combined = rows.map(row => {
+      const q = quoteMap.get(String(row.symbol).toUpperCase());
+      return Object.assign({}, row, q || {});
+    });
+    const available = combined.filter(row => row.changePercent != null && Number.isFinite(Number(row.changePercent)));
+    const quoteCount = document.getElementById("homeQuoteCount");
+    if (quoteCount) quoteCount.textContent = combined.filter(row => row.price != null && Number.isFinite(Number(row.price))).length + " / " + combined.length;
+    const gainers = available.filter(row => Number(row.changePercent)>0).sort((a,b)=>Number(b.changePercent)-Number(a.changePercent)).slice(0,5);
+    const losers = available.filter(row => Number(row.changePercent)<0).sort((a,b)=>Number(a.changePercent)-Number(b.changePercent)).slice(0,5);
+    const markup = row => '<a class="compact-stock" href="#/stock/'+encodeURIComponent(row.symbol+'.'+(row.exchange||"NSE"))+'"><span class="compact-logo">'+esc(String(row.symbol).slice(0,2))+'</span><span class="compact-info"><strong>'+esc(row.symbol)+'</strong><small>'+esc(row.name||row.tradingSymbol||"")+'</small></span><span class="compact-price">'+(row.price!=null?money(row.price):"—")+'<b class="'+(Number(row.changePercent)>=0?"up":"down")+'">'+percent(row.changePercent)+'</b></span></a>';
+    showMessage("homeDirectoryGainers", gainers.length ? gainers.map(markup).join("") : '<p class="muted">No positive changes in available quotes.</p>');
+    showMessage("homeDirectoryLosers", losers.length ? losers.map(markup).join("") : '<p class="muted">No negative changes in available quotes.</p>');
+    const best = available.slice().sort((a,b)=>Math.abs(Number(b.changePercent))-Math.abs(Number(a.changePercent)))[0];
+    const mover = document.getElementById("homeTopMover");
+    const moverChange = document.getElementById("homeTopMoverChange");
+    if (mover) mover.textContent = best ? best.symbol : "—";
+    if (moverChange) moverChange.textContent = best ? percent(best.changePercent) + " available quote" : "No quote changes returned";
+    const feed = document.getElementById("homeFeedState");
+    if (feed) feed.textContent = available.length ? "Connected" : "No quotes";
+    const feedTime = document.getElementById("homeFeedTime");
+    if (feedTime) feedTime.textContent = quoteData.updatedAt ? "Updated " + new Date(quoteData.updatedAt).toLocaleTimeString("en-IN") : "Quote timestamp not provided";
+    if (status) status.textContent = "Directory total " + Number(data.total||0).toLocaleString("en-IN") + " · " + available.length + " quotes with change data";
+  } catch (error) {
+    console.error("Homepage directory data error:", error);
+    if (status) status.textContent = "Exchange snapshot unavailable";
+    showMessage("homeDirectoryGainers", '<p class="muted">Market quote data is temporarily unavailable. Open the full directory to retry.</p>');
+    showMessage("homeDirectoryLosers", '<p class="muted">No verified loser data available.</p>');
+    const feed = document.getElementById("homeFeedState"); if (feed) feed.textContent = "Unavailable";
+  }
 }
 
 /* =========================================================
@@ -1885,6 +1747,7 @@ function renderCurrentPage() {
 
   if (page === "home") {
     setupHomeChart();
+    setupHomeDirectory();
   }
 
   if (page === "screener") {
