@@ -1,0 +1,29 @@
+/* StockPal Pro — responsive market dashboard polish */
+:root{color-scheme:light}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+header{position:sticky;top:0;z-index:30;backdrop-filter:blur(14px)}
+header>a{font-weight:850;letter-spacing:-.04em}
+nav{display:flex;gap:8px;flex-wrap:wrap}
+nav a{padding:9px 13px;border-radius:10px;text-decoration:none;font-weight:650}
+nav a:hover,nav a:focus-visible{background:#eaf1ff;color:#155eef;outline:none}
+#app{width:min(1440px,100%);margin-inline:auto;padding:clamp(14px,2.5vw,32px)}
+#app input,#app select,#app button{font:inherit}
+#app input,#app select{max-width:100%;border:1px solid #d9e2ef;border-radius:10px;padding:10px 12px;background:#fff;color:#172033}
+#app button{cursor:pointer;border-radius:10px}
+#app table{width:100%;border-collapse:collapse}
+#app th{font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;color:#68758a;background:#f6f8fc}
+#app th,#app td{padding:12px 14px;border-bottom:1px solid #e8edf5;text-align:left}
+#app tr:hover td{background:#f8faff}
+#app canvas,#app svg{max-width:100%}
+#app .panel,#app .card,#app section{min-width:0}
+#app .positive,.positive{color:#07865c!important}
+#app .negative,.negative{color:#d94758!important}
+#app .muted{color:#68758a}
+.sn-pro-grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.sn-pro-grid>*{grid-column:span 4;min-width:0}
+.sn-pro-card{background:#fff;border:1px solid #e3eaf4;border-radius:16px;padding:18px;box-shadow:0 6px 24px rgba(23,32,51,.05)}
+.sn-pro-card h2,.sn-pro-card h3{margin-top:0}
+.sn-pro-chip{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;background:#eef4ff;color:#2059bc;font-size:.78rem;font-weight:700}
+.sn-pro-note{font-size:.82rem;color:#68758a;line-height:1.5}
+@media(max-width:900px){.sn-pro-grid>*{grid-column:span 6}}
+@media(max-width:600px){header{padding:10px 12px}nav{gap:4px}nav a{padding:8px;font-size:.82rem}#app{padding:12px}.sn-pro-grid>*{grid-column:1/-1}#app th,#app td{padding:9px 8px;font-size:.85rem}}

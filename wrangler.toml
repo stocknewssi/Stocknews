@@ -1,4 +1,4 @@
-name = "stocknews"
+name = "stocknewswala"
 compatibility_date = "2026-10-05"
 main = "worker.js"
 
@@ -9,3 +9,5 @@ binding = "ASSETS"
 [[kv_namespaces]]
 binding = "STOCKNEWS_KV"
 id = "897e328377e4427bb40bed5996846b04"
+
+[previews]
