@@ -1,4 +1,4 @@
-name = "stocknews"
+name = "stocknewswala"
 compatibility_date = "2026-10-05"
 main = "worker.js"
 
