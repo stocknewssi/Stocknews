@@ -1443,12 +1443,14 @@ function setupScreener() {
     state.query = search.value.trim();
     state.exchange = exchange.value;
     target.innerHTML = directoryLoadingMarkup();
-    if (count) count.textContent = "Searching exchange directory…";
+    if (count) count.textContent = state.query ? "Searching for “" + state.query + "”…" : "Loading the exchange directory…";
+    if (prev) prev.disabled = true;
+    if (next) next.disabled = true;
     try {
       const params = new URLSearchParams({ q: state.query, exchange: state.exchange, limit: String(state.limit), offset: String(state.offset) });
-      const response = await fetch("/api/stocks?" + params.toString(), { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok || !data.success || !Array.isArray(data.stocks)) throw new Error(data.error || "Stock search failed");
+      const response = await fetch("/api/stocks?" + params.toString(), { cache: "no-store", headers: { "Accept": "application/json" } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success || !Array.isArray(data.stocks)) throw new Error(data.error || "Stock search failed (" + response.status + "). Please retry.");
       if (requestId !== state.requestId) return;
       state.total = Number(data.total) || 0;
       const rows = data.stocks;
@@ -1485,6 +1487,15 @@ function setupScreener() {
   button.addEventListener("click", () => { state.offset = 0; runSearch(); });
   prev.addEventListener("click", () => { state.offset = Math.max(0, state.offset-state.limit); runSearch(); });
   next.addEventListener("click", () => { if (state.offset+state.limit < state.total) { state.offset += state.limit; runSearch(); } });
+  search.addEventListener("keydown", event => {
+    if (event.key === "Enter") {
+      clearTimeout(debounce);
+      state.offset = 0;
+      runSearch();
+    }
+  });
+  // Populate results immediately, even before the user types a query.
+  runSearch();
 }
 /* =========================================================
    ADMIN EVENTS
