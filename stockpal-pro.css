@@ -61,3 +61,58 @@ nav a.active{background:#eaf1ff!important;color:#155eef!important;box-shadow:non
 #app .directory-company small{color:#68758a!important}
 #app .stock-detail-page .chart-placeholder{background:#fff!important;border:1px solid #e2e8f0!important;color:#172033!important}
 @media(max-width:640px){header{align-items:flex-start!important;flex-direction:column!important;gap:8px!important}nav{max-width:100%;width:100%;flex-wrap:nowrap!important}#app .hero{grid-template-columns:1fr!important;padding:24px!important}#app .hero-visual{min-height:150px}#app .directory-toolbar{align-items:stretch;flex-direction:column}#app .directory-search{width:100%}#app .directory-table-scroll{overflow-x:auto}}
+
+
+/* StockPal Night Terminal — dark premium interface */
+:root{color-scheme:dark;--sp-bg:#070b14;--sp-panel:#0d1422;--sp-panel2:#111c2e;--sp-line:#23324a;--sp-text:#e9f0fb;--sp-muted:#91a0b8;--sp-cyan:#5de4ff;--sp-blue:#6488ff;--sp-green:#31d69a;--sp-red:#ff647c}
+html{background:var(--sp-bg)!important}
+body{background:radial-gradient(ellipse at 50% -20%,#172b4c 0%,#0a1020 42%,#070b14 78%)!important;color:var(--sp-text)!important}
+header{background:rgba(7,11,20,.88)!important;border-bottom:1px solid #1c2b41!important;box-shadow:0 8px 30px #0005!important}
+header>a{color:#f3f7ff!important;font-size:1.2rem}
+nav a{color:#a8b8d1!important;border:1px solid transparent;transition:all .18s ease}
+nav a:hover,nav a.active,nav a:focus-visible{background:#152641!important;color:var(--sp-cyan)!important;border-color:#294b70!important}
+footer{color:#71829e!important;border-top:1px solid #1c2b41!important}
+#app{color:var(--sp-text)!important}
+#app h1,#app h2,#app h3,#app strong{color:#f0f5ff}
+#app p,#app .muted,#app small{color:var(--sp-muted)}
+#app .hero{position:relative;overflow:hidden;background:linear-gradient(115deg,#111d32 0%,#0b1424 56%,#142a42 100%)!important;border:1px solid #29415f!important;border-radius:24px!important;box-shadow:0 22px 65px #0005!important;padding:clamp(24px,4vw,52px)!important}
+#app .hero:after{content:"";position:absolute;width:380px;height:380px;right:-100px;top:-150px;border:1px solid #4adfff30;border-radius:50%;box-shadow:0 0 0 35px #4adfff08,0 0 0 75px #4adfff06;pointer-events:none}
+#app .hero h1{font-size:clamp(2.3rem,5vw,4.3rem);line-height:1.02;letter-spacing:-.055em;color:#f6f9ff!important;max-width:720px}
+#app .hero h1 span{background:linear-gradient(90deg,#5de4ff,#7c9bff 60%,#c29aff);-webkit-background-clip:text;background-clip:text;color:transparent}
+#app .hero p{color:#a8bad4!important;max-width:570px;line-height:1.75}
+#app .hero-badge,#app .live-badge,#app .market-live-chip{background:#112a31!important;border:1px solid #245b5b!important;color:#66edc1!important;border-radius:999px;padding:7px 12px}
+#app .hero-chart{background:linear-gradient(145deg,#101d31,#0b1422)!important;border:1px solid #29415f!important;border-radius:18px!important;box-shadow:inset 0 1px #ffffff08!important}
+#app .chart-line{filter:drop-shadow(0 0 9px #5de4ff99)}
+#app .summary-card,#app .index-card,#app .stock-card,#app .sector-card,#app .directory-table-card,#app .admin-card,#app .news-card,#app .detail-stat,#app .stock-detail-hero,#app .panel,#app .admin-side-card,#app .auth-card,#app .empty-card,#app .market-hero,#app .detail-panel{background:linear-gradient(145deg,#111b2c,#0c1422)!important;border:1px solid #24344b!important;color:var(--sp-text)!important;box-shadow:0 12px 30px #0002!important;border-radius:16px!important}
+#app .summary-card:hover,#app .index-card:hover,#app .stock-card:hover,#app .sector-card:hover{border-color:#3b628a!important;transform:translateY(-2px);transition:all .18s ease}
+#app .summary-card strong,#app .index-card strong{color:#f5f8ff!important}
+#app .positive,#app .up,#app .green-text{color:var(--sp-green)!important}
+#app .negative,#app .down,#app .red-text{color:var(--sp-red)!important}
+#app .section-heading{margin-bottom:18px}
+#app .eyebrow{color:var(--sp-cyan)!important;letter-spacing:.14em;font-weight:800}
+#app .section-link,#app a.directory-view{color:var(--sp-cyan)!important}
+#app .stock-card-grid,#app .sector-grid,#app .summary-grid,#app .market-index-grid{gap:14px}
+#app .sector-card{padding:18px!important}
+#app .directory-toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;background:#0d1727!important;border:1px solid #26364f!important;border-radius:18px!important;padding:16px!important;box-shadow:0 10px 28px #0002!important}
+#app .directory-search{flex:1;min-width:220px;background:#080f1c!important;border:1px solid #2b3b54!important;border-radius:12px!important;color:#a7bad5!important}
+#app .directory-search input,#app input,#app select,#app textarea{background:#080f1c!important;color:#edf4ff!important;border:1px solid #2b3b54!important;border-radius:10px!important}
+#app input::placeholder,#app textarea::placeholder{color:#637590!important}
+#app .directory-refresh,#app .directory-pagination button,#app .primary-btn{background:linear-gradient(120deg,#2878e8,#5368f4)!important;color:white!important;border:1px solid #5687ff!important;border-radius:11px!important;box-shadow:0 6px 18px #2459d333!important}
+#app .secondary-btn,#app .directory-view{background:#12233a!important;color:#9cecff!important;border:1px solid #2a4867!important;border-radius:10px!important}
+#app .directory-table-head{padding:18px 18px 10px}
+#app .directory-table-scroll{overflow-x:auto}
+#app .directory-table,#app table{background:transparent!important;color:#dce7f7!important}
+#app .directory-table th,#app th{background:#121f32!important;color:#8fa4c1!important;border-bottom:1px solid #2b3b54!important}
+#app .directory-table td,#app td{border-bottom:1px solid #1d2a3e!important;color:#d9e5f6!important}
+#app .directory-table tbody tr:hover td,#app tr:hover td{background:#13243a!important}
+#app .directory-symbol-logo{background:#183451!important;color:#76e7ff!important;border:1px solid #2a5270!important}
+#app .directory-exchange,#app .exchange-badge{background:#16273b!important;color:#9eb9dc!important;border:1px solid #2b415c!important}
+#app .directory-stats>div{background:#0e1828!important;border:1px solid #22334b!important;border-radius:14px!important;padding:16px}
+#app .directory-message{background:#0b1422!important;border:1px dashed #30445f!important;color:#dbe7f7!important;border-radius:14px!important}
+#app .directory-disclaimer,#app .sn-pro-note{color:#8294af!important}
+#app .auth-page{min-height:65vh;display:grid;place-items:center;padding:28px 12px;background:radial-gradient(ellipse at center,#152a46 0%,transparent 65%)}
+#app .auth-card{width:min(460px,100%);padding:clamp(24px,4vw,38px)!important}
+#app .auth-logo{display:grid;place-items:center;width:58px;height:58px;border-radius:17px;background:linear-gradient(135deg,#3b8dff,#755cff);color:white!important;font-weight:900;font-size:1.25rem;box-shadow:0 10px 30px #386cff44;margin-bottom:22px}
+#app label{color:#a9bad2}
+#app .form-message{color:#9db0cb}
+@media(max-width:700px){#app .hero{padding:24px!important;border-radius:18px!important}#app .hero h1{font-size:2.35rem}#app .directory-toolbar{align-items:stretch}#app .directory-search{min-width:100%}nav{justify-content:center}}
